@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>哐当 · 废品场</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
+<script type="importmap">{"imports":{"three":"./lib/three.module.min.js","three/addons/":"./lib/addons/"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="storm"><i></i><i></i></div>
+<div id="sandblind"></div>
+<div id="speed"></div>
+<div id="hud">
+  <canvas id="radar" width="200" height="200"></canvas>
+  <div id="fps"><b>60</b> FPS</div>
+  <div id="combo"><div class="rk">D</div><div class="cinfo"><b>连杀 ×<span class="cn">0</span></b><i>LV <span class="clv">1</span> · 分数 ×<span class="mul">1.0</span></i><div class="cbar"><u></u></div></div></div>
+  <div id="topbar"><span class="tag">普通</span><span>第 <b id="lvl">1</b> 关</span><i>·</i><span>剩余 <b id="left">0</b></span><i>·</i><span>分数 <b id="score">0</b></span><span class="tag2" id="special" hidden>特殊关卡</span></div>
+  <div id="btrack"></div>
+  <div id="bossbar"><b></b><em></em><div class="bar"><i class="f"></i></div></div>
+  <div id="bossintro"></div>
+  <div id="cross"><i></i><i></i><i></i><i></i></div>
+  <div id="hitm"><i></i><i></i><i></i><i></i></div>
+  <div id="hurtdir"></div>
+  <div id="panel">
+    <div class="row"><span class="lab">AR</span><div class="bar"><i id="arbar"></i></div><b id="artxt">50</b></div>
+    <div class="row"><span class="lab hp">HP</span><div id="hpcells"></div></div>
+    <div class="ammo"><b id="mag">12</b><span id="res">/ ∞</span><span class="wn" id="wname">手枪</span></div>
+    <div id="magcells"></div>
+    <div class="buffs" id="buffs"><span class="buff off">暂无增益</span></div>
+  </div>
+  <div id="slots"></div>
+  <div id="dossier"></div>
+  <div id="banner"><div class="tape"><span id="bannertxt"></span></div></div>
+  <div id="comic"><span></span></div>
+  <div id="pops"></div>
+  <div id="reload"><i></i><span>RELOAD</span></div>
+  <div id="hint"></div>
+</div>
+<div id="cards"><div class="ttl"></div><div class="row3"></div><div class="foot">点击卡牌或按 1 / 2 / 3 选择 · 增益全局生效，负面属性同样永久</div></div>
+<div id="menu">
+  <div class="mwin"><div class="mbar">CLANG! 拆机试炼场 <span>v0.9 · 浏览器打开 · 直接开玩</span></div>
+    <div class="mbody">
+      <div class="mleft"><div id="mtitle"></div><div id="nav"></div><div id="minfo"></div>
+        <p class="k">WASD 移动 · 空格 跳 · 鼠标 瞄准 · 左键 开火 · R 换弹 · 1-4/滚轮 换枪 · E 勾锁 · Shift 冲刺 · M 音乐 · Esc 暂停</p></div>
+      <div id="page"></div>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
