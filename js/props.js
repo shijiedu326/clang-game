@@ -100,6 +100,7 @@ function crane(x, z) {
 }
 
 export function buildProps() {
+  sd = 11; // 每次重建废品场都一样
   const W = ARENA + 3;
   // ---- 外围：集装箱墙 ----
   for (let i = -W; i < W; i += 6.2) {
@@ -173,3 +174,5 @@ export function buildProps() {
     if (R() < .5) place(cyl(1, 1.6, 20 + R() * 20, 0x9a8a72, 0, 10, 'rusty'), Math.cos(a) * r + 6, 14, Math.sin(a) * r);
   }
 }
+
+export { R as rnd, CONT, stairs, trussTower, trussSpan, container, barrel, tires, barrier, pipe, billboard, waterTower, crane };

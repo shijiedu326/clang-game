@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { P, eyePos, hurtPlayer } from './player.js';
 import { BOSS_TYPES } from './bosses.js';
 import { CRITTER_TYPES } from './critters.js';
+import { CRITTER2_TYPES, detonateMines } from './critters2.js';
 import { resolve, groundAt, rayWorld, findSpot } from './world.js';
 import { burst, graffiti, popText, tracer, smoke, flashStar, scatter } from './fx.js';
 import { BUILD, setFlash, animate } from './robots.js';
@@ -32,7 +33,7 @@ export const TYPES = {
   hauler: { name: '重装机', en: 'HAULER', no: 5, hp: 150, speed: 2.6, r: 1.1, h: 2.3, color: 0xf0a51c, score: 400, frontArmor: true, heavy: true, atk: '推土铲撞击', weak: '背后散热口', armor: '正面推土铲装甲 · 减伤 88%', threat: 3 },
 };
 
-Object.assign(TYPES, CRITTER_TYPES, BOSS_TYPES);
+Object.assign(TYPES, CRITTER_TYPES, CRITTER2_TYPES, BOSS_TYPES);
 
 const laserGeo = new THREE.BoxGeometry(1, 1, 1);
 export function spawn(type, x, z, hpMul = 1) {
@@ -171,14 +172,14 @@ const ty0 = (dx, dz) => Math.atan2(-dx, -dz);
 // 范围伤害（连锁爆破用）
 // kind: 'boom' 时有伤害数字；kb>0 时把敌人炸飞。返回打中几个
 export function blast(center, radius, dmg, src, kind = '', kb = 0) {
-  let n = 0;
+  let n = 0; detonateMines(center, radius + 0.6);
   for (const e of [...enemies]) {
     if (e.dead || e === src) continue;
     const d = Math.hypot(e.pos.x - center.x, e.pos.z - center.z);
     if (d < radius + e.t.r) {
       const dir = new THREE.Vector3(e.pos.x - center.x, 0, e.pos.z - center.z).normalize();
       damageEnemy(e, dmg * (1 - d / (radius + e.t.r) * 0.5), false, dir, true, kind); n++;
-      if (kb && !e.dead && !e.t.heavy && !e.t.ai) { e.kb = e.kb || new THREE.Vector3(); e.kb.addScaledVector(dir, kb); }
+      if (kb && !e.dead && !e.t.heavy && (!e.t.ai || e.t.stunOK)) { e.kb = e.kb || new THREE.Vector3(); e.kb.addScaledVector(dir, kb); }
     }
   }
   return n;
@@ -192,9 +193,11 @@ function absorb(e, d, kind) {
   if (e.shield <= 0) { e.shield = 0; shieldHooks.broke && shieldHooks.broke(e); }
   return Math.max(0, d - take / k);
 }
-// 射线检测：返回 {e,t,head}
-export function rayEnemies(o, d, max) {
-  let best = null;
+// 射线检测：返回最近的 {e,t,head}；rayEnemiesAll 返回整条线上所有的（按远近排好）
+export function rayEnemies(o, d, max) { return rayHits(o, d, max, false); }
+export function rayEnemiesAll(o, d, max) { return rayHits(o, d, max, true); }
+function rayHits(o, d, max, all) {
+  let best = null; const out = all ? [] : null;
   for (const e of enemies) {
     if (e.dead) continue;
     const r = e.t.r + 0.1, y0 = e.pos.y, y1 = e.pos.y + e.t.h;
@@ -206,9 +209,10 @@ export function rayEnemies(o, d, max) {
     if (t < 0 || t > max) continue;
     const y = o.y + d.y * t; if (y < y0 || y > y1) continue;
     const hd = e.t.head;
-    if (!best || t < best.t) best = { e, t, head: !!hd && y > y0 + e.t.h * hd[0] && y < y0 + e.t.h * hd[1] };
+    const h = { e, t, head: !!hd && y > y0 + e.t.h * hd[0] && y < y0 + e.t.h * hd[1] };
+    if (all) out.push(h); else if (!best || t < best.t) best = h;
   }
-  return best;
+  return all ? out.sort((a, b) => a.t - b.t) : best;
 }
 
 // 返回 'kill' | 'armor' | 'hit'
@@ -228,13 +232,13 @@ export function damageEnemy(e, dmg, head, fromDir, splash = false, kind = '') {
   if (e.exposed) { m *= 2; tag = tag || 'WEAK!'; cls = 'crit'; }
   if (e.t.bodyArmor && !head) m *= e.t.bodyArmor;
   if (e.armorAll && !head && !e.exposed) { m *= e.armorAll; res = 'armor'; tag = 'TINK!'; cls = 'clang'; }
-  if (e.t.frontArmor) {
+  if (e.t.frontArmor && !(e.guardDown > 0)) {
     const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
     const dot = -(fromDir.x * fx + fromDir.z * fz);
     if (dot > 0.3) { m *= mods.armorK; tag = 'TINK!'; cls = 'clang'; res = 'armor'; } else { m *= 1.6; tag = 'BACK!'; cls = 'crit'; }
   }
   const dealt = dmg * m;
-  e.hp -= absorb(e, dealt); e.flash = 0.06; setFlash(e.rig, true); e.hitT = 0; e.lastHead = head;
+  e.hp -= absorb(e, dealt, kind); e.flash = 0.06; setFlash(e.rig, true); e.hitT = 0; e.lastHead = head;
   if (!e.t.heavy && !e.t.fly && fromDir) { e.kb = e.kb || new THREE.Vector3(); e.kb.x += fromDir.x * Math.min(5, dealt * 0.3); e.kb.z += fromDir.z * Math.min(5, dealt * 0.3); }
   const pos = new THREE.Vector3(e.pos.x, e.pos.y + e.t.h * (head ? .92 : .6), e.pos.z);
   popText(tag || String(Math.round(dealt)), pos.clone().add(new THREE.Vector3((Math.random() - .5) * .5, .3, 0)), cls || 'num');
@@ -254,6 +258,7 @@ export function killEnemy(e, dir) {
   graffiti(e.pos.x, e.pos.z, e.type === 'hauler' ? 1.6 : 1);
   popText('KO!', c.clone().add(new THREE.Vector3(0, e.t.h * 0.6, 0)), 'ko');
   const k = enemies.indexOf(e); if (k >= 0) enemies.splice(k, 1);
+  if (e.t.onDeath) e.t.onDeath(e);
   hooks.onKill && hooks.onKill(e);
 }
 export function clearEnemies() { for (const e of enemies) { scene.remove(e.mesh); if (e.laser) scene.remove(e.laser); } enemies.length = 0; }

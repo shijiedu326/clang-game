@@ -32,14 +32,15 @@ export function ignite(e, power = 1) {
 const burnChance = () => mods.burn + (mods.sets.fire ? 0.15 : 0);
 
 // ---------- 电击：从一个敌人开始，依次跳到最近的下一个 ----------
-function bolt(a, b) {
-  const pts = [a.clone()], n = 5;
-  for (let i = 1; i < n; i++) pts.push(a.clone().lerp(b, i / n).add(new THREE.Vector3((Math.random() - .5) * .7, (Math.random() - .5) * .7, (Math.random() - .5) * .7)));
+export function bolt(a, b, k = 1) {
+  const n = Math.max(5, Math.min(14, Math.round(a.distanceTo(b) / 1.5))), pts = [a.clone()];
+  const L = a.distanceTo(b);
+  for (let i = 1; i < n; i++) { const j = .7 * Math.min(1, L * i / n / 4); pts.push(a.clone().lerp(b, i / n).add(new THREE.Vector3((Math.random() - .5) * j, (Math.random() - .5) * j, (Math.random() - .5) * j))); }
   pts.push(b.clone());
   for (let i = 0; i < pts.length - 1; i++) {
     const p = pts[i], q = pts[i + 1], len = p.distanceTo(q);
-    for (const [c, w] of [[0x5fd8ff, 0.09], [0xf2fdff, 0.035]]) {
-      const m = new THREE.Mesh(box, mat(c)); m.scale.set(w, w, len); m.position.copy(p).lerp(q, .5); m.lookAt(q); addFx(m, 0.13, null);
+    for (const [c, w] of [[0x5fd8ff, 0.09 * k], [0xf2fdff, 0.035 * k]]) {
+      const m = new THREE.Mesh(box, mat(c)); m.scale.set(w, w, len); m.position.copy(p).lerp(q, .5); m.lookAt(q); addFx(m, 0.13 + (k - 1) * 0.05, null);
     }
   }
   burst(b, 0x9fe8ff, 5, 5, 0.06);
@@ -61,7 +62,7 @@ export function zap(e0, from) {
 function shock(e, d) {
   if (e.dead) return;
   damageEnemy(e, d, false, null, true, 'shock');
-  if (mods.arcStun && !e.dead && !e.t.ai && !e.t.boss) e.stun = Math.max(e.stun || 0, mods.arcStun);
+  if (mods.arcStun && !e.dead && (!e.t.ai || e.t.stunOK) && !e.t.boss) e.stun = Math.max(e.stun || 0, mods.arcStun);
   e.shockT = 0.5;
 }
 

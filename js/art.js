@@ -59,6 +59,25 @@ TEX.ground = canvasTex(512, 512, (g, w, h) => {
   for (let i = 0; i < 9; i++) { let x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (rnd() - .5) * 40; y += (rnd() - .5) * 40; g.lineTo(x, y); } g.stroke(); }
   g.fillStyle = 'rgba(90,70,45,.12)'; for (let i = 0; i < 1500; i++) g.fillRect(rnd() * w, rnd() * h, 2, 2);
 }, true);
+// 炼钢厂地面：深色花纹钢板 + 铆钉 + 焦痕
+TEX.millFloor = canvasTex(512, 512, (g, w, h) => {
+  g.fillStyle = '#868c97'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 128) for (let x = 0; x < w; x += 128) { g.fillStyle = `rgba(${60 + rnd() * 30 | 0},${62 + rnd() * 30 | 0},${70 + rnd() * 30 | 0},.35)`; g.fillRect(x + 2, y + 2, 124, 124); }
+  g.strokeStyle = 'rgba(30,32,40,.6)'; g.lineWidth = 3;
+  for (let i = 0; i <= w; i += 128) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, h); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(w, i); g.stroke(); }
+  g.fillStyle = 'rgba(30,32,40,.5)';
+  for (let y = 0; y < h; y += 128) for (let x = 0; x < w; x += 128) for (const [a, b] of [[10, 10], [118, 10], [10, 118], [118, 118]]) { g.beginPath(); g.arc(x + a, y + b, 3, 0, 7); g.fill(); }
+  g.strokeStyle = 'rgba(40,42,50,.25)'; g.lineWidth = 2;
+  for (let i = 0; i < 700; i++) { const x = rnd() * w, y = rnd() * h, a = (i % 2) * 1.2 - 0.6; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 8, y + Math.sin(a) * 8); g.stroke(); }
+  for (let i = 0; i < 12; i++) { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 60); gr.addColorStop(0, 'rgba(20,16,14,.45)'); gr.addColorStop(1, 'rgba(20,16,14,0)'); g.save(); g.translate(rnd() * w, rnd() * h); g.scale(1, 0.6); g.fillStyle = gr; g.fillRect(-60, -60, 120, 120); g.restore(); }
+}, true);
+// 调车场地面：碎石
+TEX.gravel = canvasTex(512, 512, (g, w, h) => {
+  g.fillStyle = '#a49c90'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2600; i++) { const v = 110 + rnd() * 90 | 0; g.fillStyle = `rgba(${v},${v - 6},${v - 14},.7)`; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 2 + rnd() * 4, 1.5 + rnd() * 3, rnd() * 3, 0, 7); g.fill(); }
+  for (let i = 0; i < 26; i++) { g.fillStyle = 'rgba(70,66,60,.14)'; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 30 + rnd() * 60, 16 + rnd() * 40, rnd() * 3, 0, 7); g.fill(); }
+  g.fillStyle = 'rgba(40,36,30,.25)'; for (let i = 0; i < 1800; i++) g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5);
+}, true);
 TEX.hazard = canvasTex(128, 32, (g, w, h) => { g.fillStyle = '#f5c518'; g.fillRect(0, 0, w, h); g.fillStyle = '#151515'; for (let x = -h; x < w; x += 32) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 16, h); g.lineTo(x + 16 + h, 0); g.lineTo(x + h, 0); g.fill(); } }, true);
 export function signTex(lines, bg = '#f6ecd2', fg = '#151515', accent = '#e8431f') {
   return canvasTex(512, 256, (g, w, h) => {

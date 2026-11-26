@@ -257,3 +257,13 @@ button:hover{background:var(--y);transform:translate(-2px,-2px);box-shadow:7px 7
 #pops .p.elite{font-size:22px;color:#fff;background:#111;padding:1px 8px;border:2px solid #ffd23a;-webkit-text-stroke:0}
 .buff.t-fire{border-color:#e8431f;color:#ff7a4a}.buff.t-shock{border-color:#2fa8d8;color:#7fd4ff}.buff.t-boom{border-color:#f08a1c;color:#ffb860}
 .buff.on{color:#111!important;font-weight:bold}.buff.t-fire.on{background:#e8431f}.buff.t-shock.on{background:#2fa8d8}.buff.t-boom.on{background:#f08a1c}
+/* 第二批：武器升级卡 / 蓄力条 / 武器等级 */
+.cd.k-up .ch span{background:#2fa8d8;color:#fff}
+.cd.k-up .art::after{content:'▲ UPGRADE';position:absolute;right:8px;top:6px;font:bold 12px Impact,sans-serif;color:#fff;background:#2fa8d8;border:2px solid #000;padding:0 5px;letter-spacing:1px}
+#reload.wchg i{background:linear-gradient(90deg,#5fd8ff var(--p,0%),#333 0)}
+#reload.wchg span{color:#9fe8ff}
+.slot .t .wlv{font-style:normal;font:bold 11px Impact,sans-serif;background:#2fa8d8;color:#fff;padding:0 3px;border:1px solid #000}
+#pops .p.heal{color:#3fe07a;font-size:17px}
+
+.lv .lvmap{display:block;margin-top:4px;font-style:normal;font-size:11px;opacity:.85;letter-spacing:1px}
+.lv .lvmap-yard{color:#c9a25a}.lv .lvmap-mill{color:#e8731f}.lv .lvmap-rail{color:#6fa3c4}

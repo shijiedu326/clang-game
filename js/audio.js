@@ -56,9 +56,13 @@ export const sfx = {
   shot(kind) {
     if (!ok()) return; const t = now(), j = 1 + (Math.random() - .5) * 0.08;
     if (kind === 'shotgun') { noise(t, 0.35, 0.9, 'lowpass', 3000, 300, 0.7); tone(t, 0.25, 0.9, 'sine', 110, 38); noise(t + 0.32, 0.06, 0.25, 'bandpass', 2500, 0, 4); noise(t + 0.42, 0.06, 0.25, 'bandpass', 1800, 0, 4); return; }
+    if (kind === 'nail') { noise(t, 0.05, 0.5, 'highpass', 3000 * j, 0, 0.8); tone(t, 0.06, 0.45, 'square', 520 * j, 180); noise(t + 0.01, 0.1, 0.3, 'bandpass', 700, 300, 1.5); return; }
+    if (kind === 'rocket') { noise(t, 0.5, 0.75, 'bandpass', 900, 3200, 0.8); tone(t, 0.35, 0.8, 'sine', 90, 40); noise(t, 0.08, 0.5, 'lowpass', 1500, 200, 0.7); return; }
+    if (kind === 'arc') { tone(t, 0.22, 0.5, 'sawtooth', 1800 * j, 220); tone(t, 0.18, 0.4, 'square', 120, 60); noise(t, 0.2, 0.55, 'highpass', 2500, 0, 0.8); [2300, 3100, 4100].forEach((f, i) => tone(t + i * 0.03, 0.05, 0.12, 'square', f)); return; }
     if (kind === 'smg') { noise(t, 0.08, 0.45, 'bandpass', 2200 * j, 900, 0.8); tone(t, 0.07, 0.4, 'sine', 160 * j, 60); return; }
     noise(t, 0.14, 0.65, 'bandpass', 1700 * j, 600, 0.7); tone(t, 0.12, 0.65, 'sine', 140 * j, 45); noise(t, 0.02, 0.4, 'highpass', 4000);
   },
+  charge(c) { if (!ok()) return; const t = now(); tone(t, 0.1, 0.1 + c * 0.12, 'sawtooth', 300 + c * 1400, 340 + c * 1500); if (c >= 0.99) noise(t, 0.05, 0.15, 'highpass', 5000); },
   clang() {
     if (!ok()) return; const t = now();
     [523, 1271, 1987, 2843, 3611].forEach((f, i) => tone(t, 0.45 - i * 0.06, 0.16 / (i * 0.5 + 1), i % 2 ? 'square' : 'sine', f * (0.97 + Math.random() * 0.06)));
@@ -108,6 +112,7 @@ export const sfx = {
   chain() { if (!ok()) return; const t = now(); for (let i = 0; i < 6; i++) noise(t + i * 0.07, 0.05, 0.25, 'bandpass', 3000 + i * 300, 0, 6); },
   bossDown() { if (!ok()) return; const t = now(); noise(t, 1.6, 0.9, 'lowpass', 2500, 80, 0.7); tone(t, 1.0, 0.8, 'sine', 80, 25); [523, 659, 784, 1047, 1319].forEach((f, i) => tone(t + 0.5 + i * 0.1, 0.35, 0.18, 'square', f)); },
   tink() { if (!ok()) return; const t = now(); tone(t, 0.06, 0.06, 'triangle', 2400 + Math.random() * 1200); },
+  thunder() { if (!ok()) return; const t = now(); noise(t, 0.35, 0.28, 'lowpass', 2400, 300); noise(t + 0.08, 2.4, 0.42, 'lowpass', 420, 50); tone(t + 0.1, 1.6, 0.25, 'sine', 55, 30); },
   boom() { if (!ok()) return; const t = now(); noise(t, 0.6, 0.6, 'lowpass', 1500, 100); tone(t, 0.4, 0.5, 'sine', 90, 35); tone(t, 0.3, 0.12, 'square', 880, 1320); },
   // 流派与精英怪
   ignite() { if (!ok()) return; const t = now(); noise(t, 0.35, 0.35, 'bandpass', 400, 1800, 0.8); noise(t + 0.05, 0.3, 0.2, 'lowpass', 900, 300); },

@@ -84,6 +84,72 @@ function shotgun() {
   return g;
 }
 
+// 穿透钉枪：黄色工地气动钉枪，侧面挂钉子卷盘
+function nailgun() {
+  const g = new THREE.Group(), YEL = 0xf0b81c;
+  add(g, box(0.1, 0.13, 0.36, YEL, 0, 'rusty'), 0, 0.01, -0.16);
+  add(g, box(0.104, 0.03, 0.3, 0x2a2e33, 0, 'metal'), 0, 0.085, -0.17);
+  add(g, box(0.07, 0.07, 0.16, 0x3a4046, 0, 'metal'), 0, 0.0, -0.42);
+  add(g, box(0.05, 0.1, 0.05, 0x2a2e33, 0, 'metal'), 0, -0.03, -0.52);
+  add(g, box(0.09, 0.02, 0.06, 0x111111, 0, 'plain'), 0, -0.085, -0.53);
+  for (let i = 0; i < 3; i++) add(g, box(0.106, 0.012, 0.02, 0x1a1a1a, 0, 'plain'), 0, 0.04 - i * 0.03, -0.31);
+  const drum = add(g, cyl(0.085, 0.085, 0.05, 0x8a959c, 0, 14, 'metal'), -0.08, -0.06, -0.22, 0, 0, Math.PI / 2); g.userData.drum = drum;
+  add(g, cyl(0.03, 0.03, 0.055, 0xd8432a, 0, 8, 'plain'), -0.08, -0.06, -0.22, 0, 0, Math.PI / 2);
+  add(g, box(0.02, 0.1, 0.02, 0xc0c8cc, 0, 'metal'), -0.06, -0.02, -0.36, 0, 0, 0.3);
+  add(g, box(0.07, 0.17, 0.08, 0x2a2a2a, 0, 'plain'), 0, -0.12, -0.03, 0.28);
+  add(g, box(0.05, 0.05, 0.12, 0x2a2a2a, 0, 'plain'), 0, -0.02, 0.1);
+  add(g, cyl(0.012, 0.012, 0.2, 0x111111, 0, 6, 'plain'), 0, -0.05, 0.22, Math.PI / 2 - 0.4);
+  add(g, box(0.03, 0.03, 0.03, 0xd8432a, 0, 'plain'), 0.052, 0.04, -0.06);
+  hand(g, 0, -0.12, -0.02, 0.28, 0, 0, 1);
+  hand(g, -0.03, -0.1, -0.4, 0.1, 0.25, 0.55, -1);
+  const mz = new THREE.Object3D(); mz.position.set(0, -0.03, -0.57); g.add(mz); g.userData.muzzle = mz;
+  return g;
+}
+// 火箭筒：扛在肩上的绿管子，管口露出红色弹头（打出去就空了）
+function launcher() {
+  const g = new THREE.Group();
+  add(g, cyl(0.1, 0.1, 1.05, OLIVE, 0, 14, 'rusty'), 0, 0.03, -0.3, Math.PI / 2);
+  add(g, cyl(0.125, 0.11, 0.14, 0x3a4046, 0, 14, 'metal'), 0, 0.03, -0.84, Math.PI / 2);
+  add(g, cyl(0.12, 0.13, 0.12, 0x3a4046, 0, 14, 'metal'), 0, 0.03, 0.26, Math.PI / 2);
+  add(g, cyl(0.104, 0.104, 0.06, PAL.yellow, 0, 14, 'plain'), 0, 0.03, -0.62, Math.PI / 2);
+  add(g, cyl(0.104, 0.104, 0.03, 0x111111, 0, 14, 'plain'), 0, 0.03, -0.58, Math.PI / 2);
+  const nose = add(g, cyl(0.0, 0.08, 0.2, 0xd8432a, 0, 10, 'plain'), 0, 0.03, -0.96, -Math.PI / 2); g.userData.nose = nose;
+  add(g, box(0.05, 0.08, 0.12, 0x2a2e33, 0, 'metal'), 0.0, 0.16, -0.36);
+  add(g, box(0.07, 0.05, 0.05, 0x111111, 0, 'plain'), 0.0, 0.2, -0.36);
+  add(g, cyl(0.02, 0.02, 0.012, 0xff4a2a, 0, 8, 'plain'), 0.0, 0.2, -0.33, Math.PI / 2);
+  add(g, box(0.05, 0.16, 0.07, 0x2a2a2a, 0, 'plain'), 0, -0.13, -0.18, 0.2);
+  add(g, box(0.05, 0.14, 0.06, 0x2a2a2a, 0, 'plain'), 0, -0.12, -0.5, -0.1);
+  add(g, box(0.03, 0.05, 0.1, 0x111111, 0, 'plain'), 0, -0.08, -0.12);
+  hand(g, 0, -0.15, -0.16, 0.2, 0, 0, 1);
+  hand(g, -0.02, -0.15, -0.5, 0.0, 0.2, 0.4, -1);
+  const mz = new THREE.Object3D(); mz.position.set(0, 0.03, -0.92); g.add(mz); g.userData.muzzle = mz;
+  g.scale.setScalar(0.72);
+  return g;
+}
+// 蓄力电弧枪：铜线圈缠着枪管，后面一个玻璃电池，蓄力越满越亮
+const glowMat = new THREE.MeshBasicMaterial({ color: 0x2a6a80 });
+function arcgun() {
+  const g = new THREE.Group(), COPPER = 0xc8743a;
+  add(g, box(0.09, 0.11, 0.3, 0x3a4046, 0, 'metal'), 0, 0, -0.1);
+  add(g, box(0.092, 0.03, 0.26, 0x6d7a82, 0, 'metal'), 0, 0.06, -0.1);
+  add(g, cyl(0.03, 0.03, 0.42, 0x2a2e33, 0, 10, 'metal'), 0, 0.01, -0.45, Math.PI / 2);
+  for (let i = 0; i < 5; i++) add(g, cyl(0.044, 0.044, 0.03, COPPER, 0, 12, 'metal'), 0, 0.01, -0.3 - i * 0.065, Math.PI / 2);
+  for (const sx of [-1, 1]) add(g, box(0.016, 0.016, 0.14, 0xc0c8cc, 0, 'metal'), sx * 0.04, 0.01, -0.7, 0, sx * 0.15);
+  const cell = add(g, cyl(0.045, 0.045, 0.16, 0x000000, 0, 10, 'plain'), 0, 0.1, 0.04, Math.PI / 2);
+  cell.material = glowMat;
+  add(g, cyl(0.052, 0.052, 0.02, 0x2a2e33, 0, 10, 'metal'), 0, 0.1, -0.05, Math.PI / 2);
+  add(g, cyl(0.052, 0.052, 0.02, 0x2a2e33, 0, 10, 'metal'), 0, 0.1, 0.13, Math.PI / 2);
+  add(g, box(0.065, 0.16, 0.08, 0x2a2a2a, 0, 'plain'), 0, -0.12, 0.0, 0.3);
+  add(g, box(0.07, 0.09, 0.2, WOOD, 0, 'wood'), 0, -0.03, 0.2, -0.08);
+  add(g, box(0.03, 0.03, 0.03, 0x5fd8ff, 0, 'plain'), 0.05, 0.03, -0.15);
+  hand(g, 0, -0.12, 0.0, 0.3, 0, 0, 1);
+  hand(g, -0.02, -0.09, -0.38, 0.1, 0.25, 0.55, -1);
+  const mz = new THREE.Object3D(); mz.position.set(0, 0.01, -0.78); g.add(mz); g.userData.muzzle = mz;
+  const spark = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshBasicMaterial({ color: 0xbff4ff })); spark.position.set(0, 0.01, -0.76); spark.visible = false; g.add(spark); g.userData.spark = spark;
+  g.scale.setScalar(0.85);
+  return g;
+}
+
 // 枪口火光：八角星，带描边
 const starShape = (() => { const s = new THREE.Shape(); for (let i = 0; i < 16; i++) { const r = i % 2 ? 0.035 : 0.12, a = i / 16 * Math.PI * 2; i ? s.lineTo(Math.cos(a) * r, Math.sin(a) * r) : s.moveTo(r, 0); } return s; })();
 const flashGeo = new THREE.ShapeGeometry(starShape);
@@ -96,7 +162,12 @@ const LAYOUT = {
   smg: { make: () => [smg()], pos: [[0.26, -0.25, -0.5]], ry: 0.3, rz: -0.08, rx: 0.05 },
   shotgun: { make: () => [shotgun()], pos: [[0.25, -0.26, -0.48]], ry: 0.28, rz: -0.08, rx: 0.06 },
   dual: { make: () => [pistol(1), pistol(-1, 0x8a8f94, 0x3a3a3a)], pos: [[0.33, -0.31, -0.62], [-0.33, -0.31, -0.62]], ry: 0.5, rz: -0.12, rx: 0.12 },
+  nail: { make: () => [nailgun()], pos: [[0.27, -0.27, -0.52]], ry: 0.32, rz: -0.08, rx: 0.05 },
+  rocket: { make: () => [launcher()], pos: [[0.36, -0.3, -0.56]], ry: 0.26, rz: -0.06, rx: 0.05 },
+  arc: { make: () => [arcgun()], pos: [[0.27, -0.28, -0.54]], ry: 0.3, rz: -0.08, rx: 0.06 },
 };
+// weapons.js 每帧写：loaded=弹匣里还有没有（火箭弹头显隐），charge=电弧蓄力 0..1
+export const vmState = { loaded: true, charge: 0 };
 let root = null, guns = [], kind = 'pistol', flashT = 0, flashes = [], fireSide = 0;
 const st = { recoil: [0, 0], raise: 0, swayX: 0, swayY: 0, pump: 0, bob: 0 };
 
@@ -117,7 +188,7 @@ export function buildVM(k) {
 export function fireVM(strength = 1) {
   const i = guns.length > 1 ? (fireSide ^= 1) : 0; const g = guns[i];
   st.recoil[i] = Math.min(1.4, st.recoil[i] + strength);
-  for (const f of g.userData.flash) { f.visible = true; f.rotation.z = Math.random() * 3; f.scale.setScalar((f === g.userData.flash[1] ? 1.5 : 1) * (0.6 + Math.random() * 0.4) * (kind === 'shotgun' ? 1.25 : 1)); }
+  for (const f of g.userData.flash) { f.visible = true; f.rotation.z = Math.random() * 3; f.scale.setScalar((f === g.userData.flash[1] ? 1.5 : 1) * (0.6 + Math.random() * 0.4) * (kind === 'shotgun' || kind === 'rocket' ? 1.4 : kind === 'arc' ? 0.6 : 1)); f.material === flashMat2 && (f.visible = kind !== 'arc'); }
   g.userData.flashT = 0.045;
   if (kind === 'shotgun') st.pump = 1;
   return g;
@@ -142,6 +213,13 @@ export function updateVM(dt, s) {
     g.rotation.x = g.userData.rx + r * 0.32;
     if (g.userData.slide) g.userData.slide.position.z = Math.min(r, 1) * 0.05;
     if (g.userData.pump) { const p = st.pump > 0.5 ? (1 - st.pump) * 2 : st.pump * 2; g.userData.pump.position.z = -0.5 + p * 0.12; }
+    if (g.userData.nose) g.userData.nose.visible = vmState.loaded && st.recoil[i] < 0.6;
+    if (g.userData.drum) g.userData.drum.rotation.x += r * dt * 30;
+    if (g.userData.spark) {
+      const c = vmState.charge; glowMat.color.setRGB(0.16 + c * 0.6, 0.42 + c * 0.55, 0.5 + c * 0.5);
+      g.userData.spark.visible = c > 0.05; g.userData.spark.scale.setScalar(0.4 + c * 1.4 + Math.random() * 0.3 * c);
+      if (c > 0) { g.position.x += (Math.random() - .5) * 0.006 * c; g.position.y += (Math.random() - .5) * 0.006 * c; }
+    }
     if (g.userData.flashT > 0) { g.userData.flashT -= dt; if (g.userData.flashT <= 0) g.userData.flash.forEach(f => f.visible = false); }
   });
 }

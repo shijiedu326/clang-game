@@ -20,7 +20,7 @@ let scene;
 const vis = new Map(), pend = [], firstSeen = new Set();
 export function initElites(s) { scene = s; }
 export function eliteChance(lv) { return lv < 6 ? 0 : Math.min(0.06 + (lv - 6) * 0.012, 0.28) + (lv > 30 ? 0.08 : 0); }
-export const ELITE_TYPES = ['grunt', 'spotter', 'hauler'];
+export const ELITE_TYPES = ['grunt', 'spotter', 'hauler', 'shieldbot', 'splitter', 'spider'];
 
 const ringG = new THREE.RingGeometry(0.78, 1, 40), shellG = new THREE.SphereGeometry(1, 22, 14);
 const noInk = o => { o.layers.set(NO_INK); return o; };

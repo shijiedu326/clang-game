@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toon, toonTex, TEX, PAL } from './art.js';
-import { buildProps } from './props.js';
+import { buildProps, PLATFORMS } from './props.js';
 
 export const solids = []; // AABB {x0,x1,y0,y1,z0,z1}
 export const clouds = [];
@@ -21,41 +21,53 @@ export function placeBox(mesh, x, y, z) {
   return mesh;
 }
 
-function bake(scene) {
+// 地图层：每张图的静态物体合并后放在 mapRoot 里，换图时整层拆掉重建
+let mapRoot, mapLights, hemi, sun, ground, sceneRef;
+function bake() {
   staticGroup.updateMatrixWorld(true);
   const byMat = new Map();
   staticGroup.traverse(o => {
     if (!o.isMesh) return;
-    const g = o.geometry.index ? o.geometry.clone() : o.geometry.clone();
+    const g = o.geometry.clone();
     g.applyMatrix4(o.matrixWorld);
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
     if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]);
-    if (!byMat.has(o.material)) byMat.set(o.material, []);
-    byMat.get(o.material).push(g);
+    const key = o.userData.glow ? 'g' : 's';
+    if (!byMat.has(o.material)) byMat.set(o.material, { key, list: [] });
+    byMat.get(o.material).list.push(g);
   });
-  for (const [mat, list] of byMat) {
+  for (const [mat, { key, list }] of byMat) {
     const m = new THREE.Mesh(mergeGeometries(list, false), mat);
-    m.castShadow = m.receiveShadow = true;
-    scene.add(m); list.forEach(g => g.dispose());
+    if (key === 'g') m.layers.set(1); else m.castShadow = m.receiveShadow = true; // 发光件（钢水、灯）不描边不投影
+    mapRoot.add(m); list.forEach(g => g.dispose());
   }
 }
 
+const SKY_V = 'varying vec3 vp; void main(){ vp = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }';
+const SKY_F = `varying vec3 vp; uniform float storm, stars; uniform vec3 top, mid, hor;
+  float hsh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+  void main(){
+    float h = vp.y;
+    vec3 c = h > 0.18 ? mix(mid, top, smoothstep(0.18, 0.7, h)) : mix(hor, mid, smoothstep(-0.02, 0.18, h));
+    if (stars > 0.) { vec3 q = floor(vp * 160.); float s = step(0.996, hsh(q)) * smoothstep(0.08, 0.4, h); c += vec3(s) * stars * (0.5 + 0.5 * hsh(q + 1.)); }
+    c = mix(c, mix(vec3(0.68,0.55,0.36), vec3(0.83,0.70,0.48), smoothstep(0.4, -0.1, h)), storm);
+    gl_FragColor = vec4(c, 1.);
+    #include <colorspace_fragment>
+  }`;
+let moon; const cloudMats = [];
 function sky(scene) {
+  const c3 = h => new THREE.Color(h);
   const mat = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { storm: { value: 0 } },
-    vertexShader: 'varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
-    fragmentShader: `varying float h; uniform float storm; void main(){
-      vec3 top = vec3(0.30,0.62,0.86), mid = vec3(0.62,0.82,0.93), hor = vec3(0.96,0.90,0.76);
-      vec3 c = h > 0.18 ? mix(mid, top, smoothstep(0.18, 0.7, h)) : mix(hor, mid, smoothstep(-0.02, 0.18, h));
-      c = mix(c, mix(vec3(0.68,0.55,0.36), vec3(0.83,0.70,0.48), smoothstep(0.4, -0.1, h)), storm);
-      gl_FragColor = vec4(c, 1.);
-      #include <colorspace_fragment>
-    }`,
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { storm: { value: 0 }, stars: { value: 0 }, top: { value: c3(0x4d9edb) }, mid: { value: c3(0x9ed1ed) }, hor: { value: c3(0xf5e6c2) } },
+    vertexShader: SKY_V, fragmentShader: SKY_F,
   });
   const s = new THREE.Mesh(new THREE.SphereGeometry(330, 24, 12), mat); s.renderOrder = -1; s.frustumCulled = false; scene.add(s);
   skyMesh = s;
+  moon = new THREE.Mesh(new THREE.SphereGeometry(16, 20, 14), new THREE.MeshBasicMaterial({ color: 0xfff4d0, fog: false }));
+  moon.position.set(-150, 170, -200); moon.layers.set(1); moon.visible = false; s.add(moon);
   // 卡通云：几团压扁的球，带描边
-  const cm = toon(0xffffff, null); const cm2 = toon(0xdbe8ef, null);
+  const cm = cloudMats[0] = toonTex(null, 0xffffff); const cm2 = cloudMats[1] = toonTex(null, 0xdbe8ef);
   const g = new THREE.SphereGeometry(1, 12, 8);
   for (let i = 0; i < 11; i++) {
     const a = i / 11 * Math.PI * 2 + Math.random() * 0.3, R = 200 + Math.random() * 60, y = 45 + Math.random() * 45;
@@ -68,26 +80,69 @@ function sky(scene) {
     }
     scene.add(cl); clouds.push(cl);
   }
-  scene.traverse(o => { if (o.material && o.material.isMeshToonMaterial && (o.material === cm || o.material === cm2)) o.material.fog = false; });
+  cm.fog = cm2.fog = false;
+}
+
+// 每张地图的光线、雾、天空、地面、天气
+export const MAPS = {
+  yard: { name: '废品场', en: 'SCRAP YARD', fog: [0xf2dfb4, 70, 240], hemi: [0xfff3d6, 0x9a7448, 1.15], sun: [0xfff6e6, 3.1, 40, 60, 25], sky: [0x4d9edb, 0x9ed1ed, 0xf5e6c2], stars: 0, moon: false, clouds: [0xffffff, 0xdbe8ef], ground: 'ground', weather: null },
+  mill: { name: '夜晚炼钢厂', en: 'NIGHT MILL', fog: [0x1f2236, 36, 170], hemi: [0x7c8ac8, 0x3a2418, 0.95], sun: [0xb4c8ff, 1.5, -40, 70, -30], sky: [0x070b1e, 0x1b2142, 0x4a2e3a], stars: 1, moon: true, clouds: null, ground: 'millFloor', weather: 'embers' },
+  rail: { name: '铁路调车场', en: 'RAIL YARD', fog: [0x8f989e, 30, 165], hemi: [0xd6e0e6, 0x5a5550, 1.25], sun: [0xe4ecf2, 1.6, 30, 70, -20], sky: [0x5f6b74, 0x8b959c, 0xa9b0b2], stars: 0, moon: false, clouds: [0xb4bcc2, 0xa2abb1], ground: 'gravel', weather: 'rain' },
+};
+export let MAP = null;
+export const mapEnv = () => MAPS[MAP || 'yard'];
+export const mapForLevel = lv => ['yard', 'mill', 'rail'][Math.floor((lv - 1) / 10) % 3];
+const builders = {};
+export function registerMap(id, fn) { builders[id] = fn; }
+const groundMats = {};
+function groundMat(key) {
+  if (!groundMats[key]) { const t = TEX[key].clone(); t.repeat.set(36, 36); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; groundMats[key] = toonTex(t); }
+  return groundMats[key];
 }
 
 export function buildWorld(scene) {
-  solids.length = 0;
-  staticGroup = new THREE.Group();
+  sceneRef = scene;
   scene.fog = new THREE.Fog(0xf2dfb4, 70, 240);
-  scene.add(new THREE.HemisphereLight(0xfff3d6, 0x9a7448, 1.15));
+  hemi = new THREE.HemisphereLight(0xfff3d6, 0x9a7448, 1.15); scene.add(hemi);
   // 太阳投硬阴影（美漫的黑影块，阴影里会自动叠上排线）
-  const sun = new THREE.DirectionalLight(0xfff6e6, 3.1); sun.position.set(40, 60, 25); scene.add(sun);
+  sun = new THREE.DirectionalLight(0xfff6e6, 3.1); sun.position.set(40, 60, 25); scene.add(sun);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 10, far: 160 });
+  Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 10, far: 180 });
   sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04;
   sky(scene);
-  // 地面
-  const gt = TEX.ground.clone(); gt.repeat.set(36, 36); gt.needsUpdate = true;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(360, 360), toonTex(gt));
+  ground = new THREE.Mesh(new THREE.PlaneGeometry(360, 360), groundMat('ground'));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-  buildProps();
-  bake(scene);
+  mapRoot = new THREE.Group(); scene.add(mapRoot);
+  mapLights = new THREE.Group(); scene.add(mapLights);
+  registerMap('yard', buildProps);
+  setMap('yard');
+}
+// 换地图：拆掉旧的合并网格/碰撞盒/台面，重建并换环境。返回 true 表示真的换了
+export function setMap(id) {
+  if (MAP === id || !builders[id]) return false;
+  MAP = id;
+  for (const m of [...mapRoot.children]) { mapRoot.remove(m); m.geometry.dispose(); }
+  for (const l of [...mapLights.children]) mapLights.remove(l);
+  solids.length = 0; PLATFORMS.length = 0;
+  staticGroup = new THREE.Group();
+  builders[id]({ lights: mapLights });
+  bake();
+  staticGroup = null;
+  applyEnv();
+  return true;
+}
+// 闪电：k 为 0～1 的亮度，叠在当前地图的光上
+export function envFlash(k) { const E = mapEnv(); hemi.intensity = E.hemi[2] + k * 3; sun.intensity = E.sun[1] * (1 + k * 2); }
+export function applyEnv(storm = false) {
+  const E = mapEnv();
+  sceneRef.fog.color.setHex(E.fog[0]); sceneRef.fog.near = E.fog[1]; sceneRef.fog.far = E.fog[2];
+  hemi.color.setHex(E.hemi[0]); hemi.groundColor.setHex(E.hemi[1]); hemi.intensity = E.hemi[2];
+  sun.color.setHex(E.sun[0]); sun.intensity = E.sun[1]; sun.position.set(E.sun[2], E.sun[3], E.sun[4]);
+  const u = skyMesh.material.uniforms; u.top.value.setHex(E.sky[0]); u.mid.value.setHex(E.sky[1]); u.hor.value.setHex(E.sky[2]); u.stars.value = E.stars;
+  moon.visible = E.moon;
+  clouds.forEach(c => { c.visible = !!E.clouds && !storm; });
+  if (E.clouds) { cloudMats[0].color.setHex(E.clouds[0]); cloudMats[1].color.setHex(E.clouds[1]); }
+  ground.material = groundMat(E.ground);
 }
 
 // ---------- 物理查询 ----------

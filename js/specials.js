@@ -1,18 +1,16 @@
 import * as THREE from 'three';
 import { P } from './player.js';
-import { skyMesh, clouds } from './world.js';
+import { skyMesh, applyEnv, mapEnv } from './world.js';
 
 // 特殊关环境：沙尘暴（浓雾 + 风 + 沙粒），其它特殊关只改规则不改环境
-const NORMAL = { color: 0xf2dfb4, near: 70, far: 240 };
 let scene, cur = null, windA = 0;
 export function initSpecials(s) { scene = s; }
 export function setSpecial(kind) {
   cur = kind;
   const storm = kind === 'storm';
-  scene.fog.color.setHex(storm ? 0xd4b27a : NORMAL.color);
-  scene.fog.near = storm ? 5 : NORMAL.near; scene.fog.far = storm ? 40 : NORMAL.far;
+  applyEnv(storm); // 先恢复当前地图的雾和光，再按沙尘暴覆盖
+  if (storm) { scene.fog.color.setHex(0xd4b27a); scene.fog.near = 5; scene.fog.far = 40; }
   if (skyMesh) skyMesh.material.uniforms.storm.value = storm ? 1 : 0;
-  clouds.forEach(c => c.visible = !storm);
   document.getElementById('storm').classList.toggle('on', storm);
   P.wind = storm ? new THREE.Vector3() : null;
 }

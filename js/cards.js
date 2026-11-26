@@ -1,17 +1,25 @@
 import { mods, skills } from './stats.js';
 import { P } from './player.js';
-import { W, giveWeapon, refillAll } from './weapons.js';
+import { W, giveWeapon, refillAll, upgradeWeapon, wlv, UPG, DEFS } from './weapons.js';
 import { ICON } from './hud.js';
 
 // 卡牌池。kind: weapon 新武器 / mod 改装（可带负面）/ skill 技能
 // rarity: 1 普通(绿) 2 稀有(蓝) 3 史诗(橙)
-const boomBase = () => !!(mods.chain || mods.boomCrit || mods.he);
+const boomBase = () => !!(mods.chain || mods.boomCrit || mods.he || W.owned.includes('rocket'));
+// 武器升级卡：拿到这把枪才出现，1 级之后才出 2 级
+const up = (k, n, rarity, glyph, en) => ({ id: `u_${k}${n}`, kind: 'up', rarity, name: `${DEFS[k].name} Lv.${n}`, en, icon: DEFS[k].icon, desc: UPG[k][n - 1] + '。', stats: [['武器等级', `${n} / 2`, 1]], ok: () => W.owned.includes(k) && wlv(k) === n - 1, apply: () => upgradeWeapon(k) });
 const pct = v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%';
 export const POOL = [
   // ---- 武器 ----
   { id: 'w_smg', kind: 'weapon', rarity: 1, name: '冲锋枪', en: 'BUZZ-SMG', icon: 'smg', desc: '全自动，射速 13 发/秒，弹匣 32。', stats: [['射速', '高', 1], ['单发伤害', '低', 0]], ok: () => !W.owned.includes('smg'), apply: () => giveWeapon('smg') },
   { id: 'w_shotgun', kind: 'weapon', rarity: 2, name: '霰弹枪', en: 'BOOM-STICK', icon: 'shotgun', desc: '近距离一枪轰飞，8 颗弹丸。', stats: [['近战', '爆炸', 1], ['换弹', '慢', 0]], ok: () => !W.owned.includes('shotgun'), apply: () => giveWeapon('shotgun') },
   { id: 'w_dual', kind: 'weapon', rarity: 3, name: '双持手枪', en: 'TWIN RATTLERS', icon: 'dual', desc: '两把一起打，600 RPM，左右交替开火。', stats: [['射速', '600 RPM', 1], ['散布', '+', 0]], ok: () => !W.owned.includes('dual') && W.owned.length >= 2, apply: () => giveWeapon('dual') },
+  { id: 'w_nail', kind: 'weapon', rarity: 2, name: '穿透钉枪', en: 'NAIL DRIVER', icon: 'nail', desc: '全自动钉枪，一颗钉子能穿过一排 3 个敌人。', stats: [['穿透', '3 个', 1], ['打装甲', '会被挡住', 0]], ok: () => !W.owned.includes('nail') && W.owned.length >= 2, apply: () => giveWeapon('nail') },
+  { id: 'w_rocket', kind: 'weapon', tag: 'boom', rarity: 3, name: '火箭筒', en: 'SCRAP ROCKET', icon: 'rocket', desc: '发射火箭，落点大爆炸。对着脚下打可以火箭跳。', stats: [['爆炸', '3.2 米', 1], ['弹匣', '3 发', 0]], ok: () => !W.owned.includes('rocket') && W.owned.length >= 2, apply: () => giveWeapon('rocket') },
+  { id: 'w_arc', kind: 'weapon', tag: 'shock', rarity: 3, name: '蓄力电弧枪', en: 'ARC CANNON', icon: 'arc', desc: '按住蓄力、松手放电。光束穿过一整排敌人，蓄满伤害 5 倍，打护盾翻倍。', stats: [['蓄满伤害', '110', 1], ['需要蓄力', '1.1 秒', 0]], ok: () => !W.owned.includes('arc') && W.owned.length >= 2, apply: () => giveWeapon('arc') },
+  up('nail', 1, 1, '', 'NAIL DRIVER +'), up('nail', 2, 2, '', 'NAIL DRIVER ++'),
+  up('rocket', 1, 2, '', 'SCRAP ROCKET +'), up('rocket', 2, 3, '', 'SCRAP ROCKET ++'),
+  up('arc', 1, 2, '', 'ARC CANNON +'), up('arc', 2, 3, '', 'ARC CANNON ++'),
   // ---- 技能 ----
   { id: 's_hook', kind: 'skill', rarity: 2, name: '勾锁', en: 'GRAPPLE', glyph: '⚓', desc: '长按 E 把自己拉过去；勾中小怪会把它直接拽到你面前。', stats: [['冷却', '2.5 秒', 1]], ok: () => !skills.hook, apply: () => { skills.hook = 1; } },
   { id: 's_dash', kind: 'skill', rarity: 2, name: '推进器', en: 'JET DASH', glyph: '➤', desc: '按 Shift 向移动方向冲刺一段。', stats: [['冷却', '2.2 秒', 1]], ok: () => !skills.dash, apply: () => { skills.dash = 1; } },
@@ -97,7 +105,7 @@ export function applyCard(c) {
 }
 
 // ---------- 界面 ----------
-const KIND = { weapon: '武器', mod: '改装', skill: '技能' };
+const KIND = { weapon: '武器', mod: '改装', skill: '技能', up: '升级' };
 const RAR = { 1: '普通', 2: '稀有', 3: '史诗' };
 function tagHTML(c) {
   if (!c.tag) return '';

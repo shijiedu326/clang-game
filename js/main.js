@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { buildWorld, skyMesh, findSpot } from './world.js';
+import { buildWorld, skyMesh, findSpot, setMap, mapForLevel, MAPS, MAP } from './world.js';
+import './maps.js';
+import { initWeather, setWeather, updateWeather, wHooks as weatherHooks } from './weather.js';
 import { InkPass } from './post.js';
 import { P, keys, initInput, updatePlayer, resetPlayer, eyePos, playerHooks } from './player.js';
 import { initFx, updateFx, clearDecals, flashStar, smoke, popText } from './fx.js';
@@ -19,6 +21,8 @@ import { bgmSet, bgmUpdate, bgmToggleMute, bgmInfo, setMusicVol } from './bgm.js
 import { settings, save, seen, reach, record } from './save.js';
 import { menu, showMenu, hideMenu } from './menu.js';
 import { initElements, updateElements, clearElements, onElemKill, boom, el } from './elements.js';
+import { initRockets, updateRockets, clearRockets, rHooks } from './rockets.js';
+import { initCritters2, updateMines, clearMines, c2Hooks } from './critters2.js';
 import { initElites, updateElites, clearElites, makeElite, onEliteKill, eliteHooks, eliteChance, ELITE_TYPES, AFFIX } from './elites.js';
 
 const $ = id => document.getElementById(id);
@@ -34,7 +38,8 @@ camera.rotation.order = 'YXZ';
 vmCam.near = 0.05; vmCam.far = 420;
 renderer.setClearColor(0xf2dfb4);
 const ink = new InkPass(renderer);
-buildWorld(scene); initFx(scene, camera); initEnemies(scene); initHud(); initSkills(scene); initHazards(scene); initSpecials(scene); initElements(scene); initElites(scene);
+buildWorld(scene); initFx(scene, camera); initEnemies(scene); initHud(); initSkills(scene); initHazards(scene); initSpecials(scene); initElements(scene); initElites(scene); initRockets(scene); initCritters2(scene); initWeather(scene);
+weatherHooks.thunder = () => sfx.thunder && sfx.thunder();
 setBuffSource(buffSummary);
 
 function resize() {
@@ -46,22 +51,27 @@ addEventListener('resize', resize); resize();
 
 // ---------- 游戏状态 ----------
 export const S = { level: 1, score: 0, toSpawn: [], total: 0, killed: 0, running: false, over: false, nextT: 0, spawnT: 0, time: 0, between: false, streak: [], shake: 0, hurtFx: 0 };
-window.G = { S, P, enemies, W, scene, camera };
+window.G = { S, P, enemies, W, scene, camera, setMap, MAPS, setWeather, mapOf: () => MAP };
 
 function startLevel(lv) {
-  const plan = planLevel(lv); reach(lv);
+  const plan = planLevel(lv); reach(lv); clearMines();
+  // 每 10 关换一张地图：换图时把人送回出生点，清掉地上的弹孔和箱子
+  const mid = mapForLevel(lv), moved = setMap(mid), M = MAPS[mid];
+  if (moved) { P.pos.set(0, 0, 8); P.vel.set(0, 0, 0); clearDecals(); clearHazards(); }
+  setWeather(M.weather);
   S.level = lv; S.plan = plan; S.toSpawn = plan.list; S.total = plan.list.length + (plan.boss ? 1 : 0); S.killed = 0; S.between = false; S.spawnT = 1.8;
   S.special = plan.special; S.scoreMul = plan.special === 'supply' ? 2 : 1; setSpecial(plan.special);
   S.dropT = plan.special === 'supply' ? 6 : plan.boss ? 20 : 30;
   S.bossPending = plan.boss; S.bossE = null;
   bgmSet(plan.boss ? (((lv / 5 - 1) % 6) < 3 ? 'boss1' : 'boss2') : plan.special === 'storm' ? 'storm' : 'fight');
   if (plan.boss) { bossIntro(plan.boss, portrait(plan.boss)); S.bossIntroT = 2.8; sfx.roar(); setTimeout(() => say('boss_incoming'), 350); }
-  else { banner(`LEVEL ${String(lv).padStart(2, '0')} · GAME START!`); sfx.jingle(true); }
-  if (plan.special) { comic(SPECIALS[plan.special] + '!', plan.special === 'supply' ? '#2f8a2f' : '#a8743e'); }
+  else { banner(moved && lv > 1 ? `LEVEL ${String(lv).padStart(2, '0')} · ${M.en}` : `LEVEL ${String(lv).padStart(2, '0')} · GAME START!`, moved ? 2.6 : 1.8); sfx.jingle(true); }
+  if (moved && lv > 1) comic('新地图 · ' + M.name + '!', mid === 'mill' ? '#e8731f' : '#3a7ca5');
+  if (plan.special) setTimeout(() => comic(SPECIALS[plan.special] + '!', plan.special === 'supply' ? '#2f8a2f' : '#a8743e'), moved && lv > 1 ? 1500 : 0);
 }
 function newGame(from) {
   clearShowcase();
-  resetStats(); resetCards(); clearEnemies(); clearDecals(); clearHazards(); resetPlayer(); resetWeapons(); resetHud(); resetSkills(); clearElements(); clearElites();
+  resetStats(); resetCards(); clearEnemies(); clearDecals(); clearHazards(); resetPlayer(); resetWeapons(); resetHud(); resetSkills(); clearElements(); clearElites(); clearRockets(); clearMines();
   S.score = 0; S.over = false; S.running = true; S.streak = []; S.picking = false; S.cardAt = 0; S.cards = []; S.bossesDown = []; S.complete = false; S.endless = false;
   S.combo = 0; S.comboT = 0; S.bestCombo = 0;
   const L = from || window.__startLevel || 1;
@@ -172,6 +182,8 @@ playerHooks.onHurt = (n, from) => { if (n >= 8 && S.combo) { S.combo = Math.floo
 hooks.onSpawn = e => { dossier(e.type, portrait(e.type)); sfx.spawn(); seen('foe', e.type); };
 hooks.onLaser = () => sfx.laser();
 hooks.onShot = () => sfx.laserShot();
+wHooks.onCharge = c => sfx.charge(c);
+rHooks.hit = h => { if (h === 3) sfx.clang(); else sfx.hit(h === 2); hitMarker(h); };
 wHooks.onFire = (k, hit) => { sfx.shot(k); if (hit === 3) sfx.clang(); else if (hit) sfx.hit(hit === 2); if (hit) hitMarker(hit); };
 wHooks.onReload = (k, t) => sfx.reload(t);
 SK.on.fire = () => sfx.hookFire();
@@ -208,6 +220,9 @@ el.on.ignite = () => sfx.ignite(); el.on.zap = () => sfx.zap(); el.on.boom = () 
 eliteHooks.on.sfx = n => sfx[n] && sfx[n]();
 eliteHooks.on.shake = k => shakeK(k);
 eliteHooks.on.summon = () => { S.total++; };
+c2Hooks.spawned = () => { S.total++; };
+c2Hooks.sfx = n => sfx[n] && sfx[n]();
+c2Hooks.shake = k => shakeK(k);
 let firstQ = 0; // 第一次见到某个词条：漫画字+提示，多个同时出现就排队
 eliteHooks.on.first = a => { const A = AFFIX[a], now = performance.now(), at = Math.max(now + 700, firstQ); firstQ = at + 2600; setTimeout(() => { if (!S.running) return; comic('精英 · ' + A.name + '!', A.css); keyHint('!', A.tip, 4, ''); }, at - now); };
 window.G.makeElite = makeElite;
@@ -220,7 +235,7 @@ menu.on.start = lv => { initAudio(); applySettings(); pendingStart = lv; S.runni
 menu.on.resume = () => { initAudio(); canvas.requestPointerLock(); };
 menu.on.quit = () => toMain();
 function toMain() {
-  S.running = false; S.over = false; S.picking = false; clearEnemies(); clearHazards(); clearElements(); clearElites(); setSpecial(null);
+  S.running = false; S.over = false; S.picking = false; clearEnemies(); clearHazards(); clearElements(); clearElites(); clearRockets(); clearMines(); setMap('yard'); setWeather(null); setSpecial(null);
   $('hud').style.display = 'none'; const c = $('complete'); if (c) c.remove();
   P.pos.set(0, 0, 8); bgmSet('title'); buildShowcase(); showMenu('main');
 }
@@ -239,7 +254,7 @@ initInput(canvas, locked => {
   if (S.running) showMenu('pause');
 });
 addEventListener('keydown', e => {
-  const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 }[e.code];
+  const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6 }[e.code];
   if (n !== undefined && W.owned[n] && !S.picking) switchTo(W.owned[n]);
 });
 addEventListener('keydown', e => { if (e.code === 'KeyM') keyHint('M', bgmToggleMute() ? '音乐已关' : '音乐已开', 1.5, ''); });
@@ -273,7 +288,7 @@ function step(dt) {
   if (P.onGround && sp > 3) { stepT += dt * sp; if (stepT > 2.6) { stepT = 0; sfx.step(); } }
   ev.hit = 0; ev.kill = 0; ev.shake = 0; updateWeapons(dt, ev);
   if (ev.shake) S.shake = Math.max(S.shake, ev.shake);
-  updateEnemies(dt, S.time); updateFx(dt); updateHazards(dt, S.time); updateSpecials(dt); updateElements(dt); updateElites(dt, S);
+  updateEnemies(dt, S.time); updateFx(dt); updateHazards(dt, S.time); updateSpecials(dt); updateElements(dt); updateElites(dt, S); updateRockets(dt); updateMines(dt); updateWeather(dt, camera);
   // Boss 登场
   if (S.bossPending && !S.between) { S.bossIntroT -= dt; if (S.bossIntroT <= 0) spawnBoss(S.bossPending); }
   // 补给空投
@@ -284,7 +299,7 @@ function step(dt) {
     if (S.spawnT <= 0 && enemies.length < cap) { spawnOne(); S.spawnT = Math.max(0.5, 2.0 - S.level * 0.05); }
   }
   if (!S.between && !S.toSpawn.length && !enemies.length && !S.bossPending && S.running) {
-    S.between = true; S.nextT = 3.2; banner('STAGE CLEAR!', 2.4); sfx.jingle(true); setTimeout(() => say('stage_clear'), 300);
+    S.between = true; S.nextT = 3.2; clearMines(); banner('STAGE CLEAR!', 2.4); sfx.jingle(true); setTimeout(() => say('stage_clear'), 300);
     P.armor = Math.min(P.maxArmor, P.armor + 20); P.hp = Math.min(P.maxHp, P.hp + 15);
     setSpecial(null);
     if (S.level === LAST && !S.endless) { S.endless = true; S.cardAt = 0; setTimeout(runComplete, 2200); }

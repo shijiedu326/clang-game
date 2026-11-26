@@ -39,6 +39,9 @@ export const ICON = {
   smg: 'M2 8h52v9h-8v4h-6l-2 9h-8l2-9H22l-2 7H9l1-7H2z',
   shotgun: 'M0 9h64v5H34v4H22l-7 10H3l8-11H0z',
   dual: 'M2 5h26v6H16l-2 9H7l2-9H2zM34 13h26v6H48l-2 9h-7l2-9h-7z',
+  nail: 'M4 7h38l4 4h10v7H46l-2 3H30l-3 9H16l3-9H4zM24 14a6 6 0 1 0 12 0a6 6 0 1 0-12 0z',
+  rocket: 'M2 10h50V6h12v20H52v-4H40l-2 8h-8l2-8H20l-2 6h-7l2-6H2z',
+  arc: 'M4 9h26l3-4h8v4h12l6-3v4h5v8h-5v4l-6-3H41v4h-8l-3-4H26l-3 9H13l3-9H4z',
 };
 const svg = k => `<svg viewBox="0 0 66 32"><path d="${ICON[k]}"/></svg>`;
 
@@ -147,12 +150,15 @@ export function updateHud(dt, S, ev) {
     const mc = $('magcells'); mc.classList.toggle('many', ms > 20);
     mc.innerHTML = Array.from({ length: ms }, (_, i) => `<i${i < m ? '' : ' class="off"'}></i>`).join('');
   }
-  const rp = reloadProgress(); $('reload').style.display = rp >= 0 ? 'block' : 'none'; if (rp >= 0) $('reload').firstChild.style.setProperty('--p', (rp * 100) + '%');
+  const rp = reloadProgress(), ch = W.charge > 0 && rp < 0;
+  $('reload').style.display = rp >= 0 || ch ? 'block' : 'none'; $('reload').classList.toggle('wchg', ch);
+  if (rp >= 0) { $('reload').firstChild.style.setProperty('--p', (rp * 100) + '%'); $('reload').lastChild.textContent = 'RELOAD'; }
+  else if (ch) { $('reload').firstChild.style.setProperty('--p', (W.charge * 100) + '%'); $('reload').lastChild.textContent = W.charge >= 0.99 ? 'FULL CHARGE!' : 'CHARGING'; }
   // 武器栏
-  const sk = W.owned.join() + W.cur;
+  const sk = W.owned.join() + W.cur + JSON.stringify(W.lv);
   if (sk !== lastSlots) {
     lastSlots = sk;
-    $('slots').innerHTML = W.owned.map((k, i) => `<div class="slot${k === W.cur ? ' on' : ''}"><span class="n">${i + 1}</span>${svg(DEFS[k].icon)}<span class="t">${DEFS[k].name}</span></div>`).join('');
+    $('slots').innerHTML = W.owned.map((k, i) => `<div class="slot${k === W.cur ? ' on' : ''}"><span class="n">${i + 1}</span>${svg(DEFS[k].icon)}<span class="t">${DEFS[k].name}${W.lv[k] ? ` <em class="wlv">Lv${W.lv[k]}</em>` : ''}</span></div>`).join('');
   }
   // 准星扩散
   const spread = 7 + (W.bloom + DEFS[W.cur].spread) * 420 + (P.onGround ? 0 : 6) + Math.min(6, Math.hypot(P.vel.x, P.vel.z) * 0.5);
