@@ -102,7 +102,7 @@ html,body{height:100%;overflow:hidden;background:#1a1410;font-family:"Microsoft 
 
 /* 菜单 */
 .card{background:#2a2622;border:4px solid #000;box-shadow:10px 10px 0 var(--y);padding:24px 54px 28px;text-align:center;max-width:640px;position:relative}
-.card:before{content:"CLANG! 拆机试炼场";position:absolute;left:0;right:0;top:0;background:#111;color:#aaa;font-size:12px;padding:3px;text-align:left;padding-left:10px}
+.card:before{content:"SCRAP RIOT! 废铁暴动";position:absolute;left:0;right:0;top:0;background:#111;color:#aaa;font-size:12px;padding:3px;text-align:left;padding-left:10px}
 .logo{font-size:96px;letter-spacing:4px;color:var(--y);-webkit-text-stroke:4px #000;text-shadow:6px 6px 0 #000;margin-top:16px;transform:rotate(-3deg)}
 .sub{font-size:20px;color:#eee}.tag3{font:16px Impact,sans-serif;color:#aaa;letter-spacing:3px;margin:4px 0}
 .card .k{font-size:13px;color:#999;margin-top:10px}
@@ -240,3 +240,20 @@ button:hover{background:var(--y);transform:translate(-2px,-2px);box-shadow:7px 7
 #combo b{font-size:15px;display:block}#combo .cn{font:20px Impact,sans-serif;color:var(--y)}
 #combo i{font-style:normal;font-size:12px;color:#ccc}
 #combo .cbar{height:5px;background:#000;margin-top:3px}#combo .cbar u{display:block;height:100%;background:var(--y);width:0}
+/* 新标题 logo：SCRAP 黄、RIOT! 红，斜排加齿轮 */
+#mtitle .logo.big{position:relative;display:inline-block;line-height:.86;font-size:92px;margin-top:10px}
+#mtitle .logo.big span{display:block}
+#mtitle .logo.big .l2{color:#ff5a3c;margin-left:38px;font-size:104px}
+#mtitle .logo.big .bolt{position:absolute;right:-34px;top:-14px;font-style:normal;font-size:56px;color:#d9d2c0;-webkit-text-stroke:3px #000;text-shadow:4px 4px 0 #000;animation:boltspin 6s linear infinite}
+@keyframes boltspin{to{transform:rotate(360deg)}}
+/* ---- 流派标签 / 元素伤害字 / 增益栏流派 ---- */
+.cd .art{position:relative}
+.cd .art .tg{position:absolute;left:6px;top:6px;font:13px/1 Impact,"Microsoft YaHei",sans-serif;padding:3px 7px;border:2px solid #000;color:#fff;transform:rotate(-4deg);box-shadow:2px 2px 0 #000;letter-spacing:.5px}
+.cd .art .tg.t-fire{background:#e8431f}.cd .art .tg.t-shock{background:#2fa8d8}.cd .art .tg.t-boom{background:#f08a1c}
+.cd .art .tg.full{animation:tgpulse .7s ease-in-out infinite alternate;outline:3px solid #ffd23a}
+@keyframes tgpulse{to{transform:rotate(-4deg) scale(1.12)}}
+#pops .p.el-burn{color:#ff8a2a}#pops .p.el-shock{color:#6fd8ff}#pops .p.el-boom{color:#ffb43a}
+#pops .p.big{font-size:26px;-webkit-text-stroke:1.5px #000;text-shadow:2px 2px 0 #000}
+#pops .p.elite{font-size:22px;color:#fff;background:#111;padding:1px 8px;border:2px solid #ffd23a;-webkit-text-stroke:0}
+.buff.t-fire{border-color:#e8431f;color:#ff7a4a}.buff.t-shock{border-color:#2fa8d8;color:#7fd4ff}.buff.t-boom{border-color:#f08a1c;color:#ffb860}
+.buff.on{color:#111!important;font-weight:bold}.buff.t-fire.on{background:#e8431f}.buff.t-shock.on{background:#2fa8d8}.buff.t-boom.on{background:#f08a1c}

@@ -59,7 +59,7 @@ export function updateEnemies(dt, t) {
     if (e.flash > 0) { e.flash -= dt; if (e.flash <= 0) setFlash(e.rig, false); }
     // 中弹击退
     if (e.kb && e.kb.lengthSq() > 0.01) { e.pos.addScaledVector(e.kb, dt); resolve(e.pos, e.t.r, e.t.h); e.kb.multiplyScalar(Math.exp(-9 * dt)); }
-    if (e.spawnT > 0) { e.spawnT -= dt; const k = 1 - Math.max(0, e.spawnT) / 0.5; e.mesh.scale.setScalar(k < 1 ? 0.01 + k * (1.15 - 0.15 * k) : 1); if (e.spawnT > 0.2) continue; }
+    if (e.spawnT > 0) { e.spawnT -= dt; const k = 1 - Math.max(0, e.spawnT) / 0.5; e.mesh.scale.setScalar((k < 1 ? 0.01 + k * (1.15 - 0.15 * k) : 1) * (e.big || 1)); if (e.spawnT > 0.2) continue; }
     // Boss 和特殊小怪自己管移动与攻击
     if (e.t.ai) { e.t.ai(e, dt, t); continue; }
     const dx = P.pos.x - e.pos.x, dz = P.pos.z - e.pos.z, dist = Math.hypot(dx, dz) || 1;
@@ -99,7 +99,7 @@ export function updateEnemies(dt, t) {
       continue;
     }
     if (e.stun > 0) { e.stun -= dt; e.mesh.rotation.x = 0; e.mesh.rotation.z = Math.sin(e.stun * 30) * 0.15; e.vel.multiplyScalar(0.8); continue; }
-    const sp = e.t.speed * (e.type === 'hauler' && dist < 6 ? 1.6 : 1);
+    const sp = e.t.speed * (e.spd || 1) * (e.type === 'hauler' && dist < 6 ? 1.6 : 1);
     let mx = e.type === 'hauler' ? -Math.sin(e.yaw) : gdx / gd, mz = e.type === 'hauler' ? -Math.cos(e.yaw) : gdz / gd;
     if (e.detour > 0) {
       e.detour -= dt; const a = e.side * 1.35, c = Math.cos(a), s = Math.sin(a);
@@ -136,7 +136,7 @@ export function updateEnemies(dt, t) {
         if (e.cd <= 0) {
           hurtPlayer(e.type === 'hauler' ? 28 : 10, e.pos);
           if (e.type === 'hauler') { P.vel.x += dx / dist * 14; P.vel.z += dz / dist * 14; P.vel.y = 5; }
-          e.cd = 0.9;
+          e.cd = 0.9 / (e.spd || 1);
         }
       }
     } else {
@@ -157,11 +157,11 @@ export function updateEnemies(dt, t) {
           tracer(_a, _b, 0xff4a2a); flashStar(_a.clone().addScaledVector(dir, 0.3), 0.5);
           hooks.onShot && hooks.onShot(e);
           if (rayWorld(_a, dir, len) >= len - 0.3) hurtPlayer(22, e.pos);
-          e.cd = 2.2 + Math.random();
+          e.cd = (2.2 + Math.random()) / (e.spd || 1);
         }
       } else if (e.cd <= 0 && dist < 34) {
         const d = _b.clone().sub(_a); const len = d.length();
-        if (rayWorld(_a, d.normalize(), len) >= len - 0.3) { e.lock = 1.1; hooks.onLaser && hooks.onLaser(e); } else e.cd = 0.4;
+        if (rayWorld(_a, d.normalize(), len) >= len - 0.3) { e.lock = 1.1 / (e.spd || 1); hooks.onLaser && hooks.onLaser(e); } else e.cd = 0.4;
       }
     }
   }
@@ -169,12 +169,28 @@ export function updateEnemies(dt, t) {
 
 const ty0 = (dx, dz) => Math.atan2(-dx, -dz);
 // 范围伤害（连锁爆破用）
-export function blast(center, radius, dmg, src) {
+// kind: 'boom' 时有伤害数字；kb>0 时把敌人炸飞。返回打中几个
+export function blast(center, radius, dmg, src, kind = '', kb = 0) {
+  let n = 0;
   for (const e of [...enemies]) {
     if (e.dead || e === src) continue;
     const d = Math.hypot(e.pos.x - center.x, e.pos.z - center.z);
-    if (d < radius + e.t.r) damageEnemy(e, dmg * (1 - d / (radius + e.t.r) * 0.5), false, new THREE.Vector3(e.pos.x - center.x, 0, e.pos.z - center.z).normalize(), true);
+    if (d < radius + e.t.r) {
+      const dir = new THREE.Vector3(e.pos.x - center.x, 0, e.pos.z - center.z).normalize();
+      damageEnemy(e, dmg * (1 - d / (radius + e.t.r) * 0.5), false, dir, true, kind); n++;
+      if (kb && !e.dead && !e.t.heavy && !e.t.ai) { e.kb = e.kb || new THREE.Vector3(); e.kb.addScaledVector(dir, kb); }
+    }
   }
+  return n;
+}
+// 精英护盾先挡伤害（电击打护盾翻倍），返回穿过护盾剩下的伤害
+export const shieldHooks = { hit: null, broke: null };
+function absorb(e, d, kind) {
+  if (!(e.shield > 0)) return d;
+  const k = kind === 'shock' ? 2 : 1, take = Math.min(e.shield, d * k);
+  e.shield -= take; shieldHooks.hit && shieldHooks.hit(e);
+  if (e.shield <= 0) { e.shield = 0; shieldHooks.broke && shieldHooks.broke(e); }
+  return Math.max(0, d - take / k);
 }
 // 射线检测：返回 {e,t,head}
 export function rayEnemies(o, d, max) {
@@ -196,21 +212,29 @@ export function rayEnemies(o, d, max) {
 }
 
 // 返回 'kill' | 'armor' | 'hit'
-export function damageEnemy(e, dmg, head, fromDir, splash = false) {
+// kind: 元素伤害（burn / shock / boom）会弹出对应颜色的小数字，并且打不动无敌状态
+export function damageEnemy(e, dmg, head, fromDir, splash = false, kind = '') {
   let m = 1, tag = '', cls = '', res = 'hit';
-  if (splash) { e.hp -= dmg; e.flash = 0.06; setFlash(e.rig, true); if (e.hp <= 0) { killEnemy(e, fromDir); return 'kill'; } return 'hit'; }
+  if (splash) {
+    if (kind && e.invuln) return 'armor';
+    if (kind && e.armorAll && !e.exposed) dmg *= 0.5;
+    e.hp -= absorb(e, dmg, kind);
+    if (kind !== 'burn') { e.flash = 0.06; setFlash(e.rig, true); }
+    if (kind && dmg >= 1) popText(String(Math.round(dmg)), new THREE.Vector3(e.pos.x + (Math.random() - .5) * .6, e.pos.y + e.t.h * (0.5 + Math.random() * .4), e.pos.z), 'el-' + kind);
+    if (e.hp <= 0) { killEnemy(e, fromDir); return 'kill'; } return 'hit';
+  }
   if (e.invuln) { if (Math.random() < 0.3) popText('MISS', new THREE.Vector3(e.pos.x, e.pos.y + 0.5, e.pos.z), 'clang'); return 'armor'; }
   if (head) { m *= mods.headMul; tag = 'CRIT!'; cls = 'crit'; }
   if (e.exposed) { m *= 2; tag = tag || 'WEAK!'; cls = 'crit'; }
   if (e.t.bodyArmor && !head) m *= e.t.bodyArmor;
-  if (e.armorAll && !head && !e.exposed) { m *= e.armorAll; res = 'armor'; tag = 'CLANG!'; cls = 'clang'; }
+  if (e.armorAll && !head && !e.exposed) { m *= e.armorAll; res = 'armor'; tag = 'TINK!'; cls = 'clang'; }
   if (e.t.frontArmor) {
     const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
     const dot = -(fromDir.x * fx + fromDir.z * fz);
-    if (dot > 0.3) { m *= mods.armorK; tag = 'CLANG!'; cls = 'clang'; res = 'armor'; } else { m *= 1.6; tag = 'BACK!'; cls = 'crit'; }
+    if (dot > 0.3) { m *= mods.armorK; tag = 'TINK!'; cls = 'clang'; res = 'armor'; } else { m *= 1.6; tag = 'BACK!'; cls = 'crit'; }
   }
   const dealt = dmg * m;
-  e.hp -= dealt; e.flash = 0.06; setFlash(e.rig, true); e.hitT = 0; e.lastHead = head;
+  e.hp -= absorb(e, dealt); e.flash = 0.06; setFlash(e.rig, true); e.hitT = 0; e.lastHead = head;
   if (!e.t.heavy && !e.t.fly && fromDir) { e.kb = e.kb || new THREE.Vector3(); e.kb.x += fromDir.x * Math.min(5, dealt * 0.3); e.kb.z += fromDir.z * Math.min(5, dealt * 0.3); }
   const pos = new THREE.Vector3(e.pos.x, e.pos.y + e.t.h * (head ? .92 : .6), e.pos.z);
   popText(tag || String(Math.round(dealt)), pos.clone().add(new THREE.Vector3((Math.random() - .5) * .5, .3, 0)), cls || 'num');

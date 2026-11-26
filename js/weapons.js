@@ -5,6 +5,7 @@ import { rayEnemies, damageEnemy } from './enemies.js';
 import { tracer, burst, impact } from './fx.js';
 import { buildVM, fireVM, muzzleSide } from './viewmodel.js';
 import { mods } from './stats.js';
+import { onShot, burnBonus } from './elements.js';
 export { mods };
 export { vmScene, vmCam, updateVM } from './viewmodel.js';
 
@@ -53,7 +54,7 @@ export function updateWeapons(dt, ev) {
   const mz = _o.clone().addScaledVector(right, 0.22 * side).addScaledVector(up, -0.17).addScaledVector(_d, 0.7);
   const sp = (def.spread + W.bloom) * mods.spread + (P.onGround ? 0 : 0.01);
   const pellets = def.pellets + (def.pellets > 1 ? mods.pellets : 0);
-  let hitAny = 0, killAny = 0;
+  let hitAny = 0, killAny = 0, wall = null; const hits = [];
   for (let i = 0; i < pellets; i++) {
     const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * sp;
     const dir = _d.clone().addScaledVector(right, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r).normalize();
@@ -62,10 +63,12 @@ export function updateWeapons(dt, ev) {
     _h.copy(_o).addScaledVector(dir, t);
     if (i < 3) tracer(mz, _h.clone());
     if (hit) {
-      const res = damageEnemy(hit.e, def.dmg * mods.dmg * P.dmgMul, hit.head, dir);
+      const res = damageEnemy(hit.e, def.dmg * mods.dmg * P.dmgMul * burnBonus(hit.e), hit.head, dir);
+      hits.push({ e: hit.e, p: _h.clone(), head: hit.head });
       hitAny = Math.max(hitAny, hit.head ? 2 : 1); if (res === 'kill') killAny = 1; if (res === 'armor') hitAny = 3;
-    } else if (tw < 140) impact(_h, dir);
+    } else if (tw < 140) { impact(_h, dir); if (!wall) wall = _h.clone().addScaledVector(dir, -0.3); }
   }
+  onShot(def, hits, wall);
   W.bloom = Math.min(0.05, W.bloom + def.bloom);
   ev.hit = Math.max(ev.hit || 0, hitAny); ev.kill = ev.kill || killAny;
   wHooks.onFire && wHooks.onFire(W.cur, hitAny);

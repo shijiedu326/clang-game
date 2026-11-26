@@ -17,7 +17,7 @@ export function showMenu(mode, info = '') {
   const m = $('menu'); m.style.display = 'flex'; m.className = 'm-' + mode;
   $('nav').innerHTML = NAV[mode].map(([k, t, big]) => `<button data-k="${k}" class="${big ? 'big' : ''}">${t}</button>`).join('');
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => act(b.dataset.k));
-  $('mtitle').innerHTML = mode === 'pause' ? '<div class="logo sm">PAUSED</div>' : mode === 'over' ? '<div class="logo sm red">GAME OVER</div>' : '<div class="logo">CLANG!</div><div class="sub">哐当 · 拆机试炼场</div><div class="tag3">SCRAP. SHOOT. SURVIVE.</div>';
+  $('mtitle').innerHTML = mode === 'pause' ? '<div class="logo sm">PAUSED</div>' : mode === 'over' ? '<div class="logo sm red">GAME OVER</div>' : '<div class="logo big"><span class="l1">SCRAP</span><span class="l2">RIOT!</span><i class="bolt">⚙</i></div><div class="sub">废铁暴动 · 拆机废品场</div><div class="tag3">SCRAP. SHOOT. SURVIVE.</div>';
   $('minfo').innerHTML = info || (mode === 'main' ? `最高分 <b>${save.best}</b> · 最远第 <b>${save.bestLevel || 0}</b> 关 · 已玩 <b>${save.runs}</b> 局` : '');
   page(null);
 }

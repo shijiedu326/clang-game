@@ -163,7 +163,7 @@ export function buildProps() {
   // ---- 广告牌 ----
   billboard(-6, -62, 0, [['SCRAP YARD', 92, 110], ['废品场 · 欢迎光临', 34, 190, '#e8431f']], 11);
   billboard(-64, 18, Math.PI / 2, [['YOUR AD', 100, 105, '#e8431f'], ['HERE', 70, 185]], 9);
-  billboard(62, -22, -Math.PI / 2, [['CLANG!', 130, 128, '#e8431f']], 12);
+  billboard(62, -22, -Math.PI / 2, [['RIOT!', 130, 128, '#e8431f']], 12);
   // ---- 远景 ----
   waterTower(64, 58); crane(-66, -58);
   trussTower(70, -70, 4, 34, PAL.steel, 4); trussTower(-80, 40, 3.5, 26, PAL.rust, 4);

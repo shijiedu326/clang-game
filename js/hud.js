@@ -163,7 +163,7 @@ export function updateHud(dt, S, ev) {
   const chips = [];
   if (skills.hook) chips.push(`<span class="key${SK.hookCd > 0 ? ' cool' : ''}" style="--c:${(SK.hookCd / SK.hookMax * 100).toFixed(0)}%">E</span><span class="buff sk">勾锁</span>`);
   if (skills.dash) chips.push(`<span class="key${SK.dashCd > 0 ? ' cool' : ''}" style="--c:${(SK.dashCd / SK.dashMax * 100).toFixed(0)}%">⇧</span><span class="buff sk">冲刺</span>`);
-  for (const b of buffFn()) chips.push(`<span class="buff">${b}</span>`);
+  for (const b of buffFn()) chips.push(typeof b === 'string' ? `<span class="buff">${b}</span>` : `<span class="buff ${b.cls}">${b.html}</span>`);
   const bh = chips.length ? chips.join('') : '<span class="buff off">暂无增益</span>';
   if (bh !== lastBuff) { lastBuff = bh; $('buffs').innerHTML = bh; }
   radar(S.time);

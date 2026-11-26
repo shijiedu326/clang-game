@@ -109,4 +109,12 @@ export const sfx = {
   bossDown() { if (!ok()) return; const t = now(); noise(t, 1.6, 0.9, 'lowpass', 2500, 80, 0.7); tone(t, 1.0, 0.8, 'sine', 80, 25); [523, 659, 784, 1047, 1319].forEach((f, i) => tone(t + 0.5 + i * 0.1, 0.35, 0.18, 'square', f)); },
   tink() { if (!ok()) return; const t = now(); tone(t, 0.06, 0.06, 'triangle', 2400 + Math.random() * 1200); },
   boom() { if (!ok()) return; const t = now(); noise(t, 0.6, 0.6, 'lowpass', 1500, 100); tone(t, 0.4, 0.5, 'sine', 90, 35); tone(t, 0.3, 0.12, 'square', 880, 1320); },
+  // 流派与精英怪
+  ignite() { if (!ok()) return; const t = now(); noise(t, 0.35, 0.35, 'bandpass', 400, 1800, 0.8); noise(t + 0.05, 0.3, 0.2, 'lowpass', 900, 300); },
+  zap() { if (!ok()) return; const t = now(); for (let i = 0; i < 5; i++) { const tt = t + i * 0.025; noise(tt, 0.03, 0.35, 'highpass', 3500 + Math.random() * 2000); tone(tt, 0.03, 0.12, 'sawtooth', 1800 + Math.random() * 1500); } tone(t, 0.18, 0.18, 'square', 120, 60); },
+  pop() { if (!ok()) return; const t = now(); noise(t, 0.25, 0.4, 'lowpass', 1800, 200); tone(t, 0.15, 0.3, 'sine', 140, 50); },
+  shieldHit() { if (!ok()) return; const t = now(); tone(t, 0.12, 0.12, 'sine', 1600, 1100); tone(t, 0.1, 0.06, 'triangle', 2400, 1900); },
+  shieldBreak() { if (!ok()) return; const t = now(); noise(t, 0.4, 0.5, 'highpass', 2500); [2093, 1568, 1175].forEach((f, i) => tone(t + i * 0.04, 0.25, 0.14, 'triangle', f, f * 0.7)); },
+  beep() { if (!ok()) return; const t = now(); tone(t, 0.07, 0.18, 'square', 1500); },
+  setOn() { if (!ok()) return; const t = now(); [392, 523, 659, 784, 1047, 1319].forEach((f, i) => { tone(t + i * 0.07, 0.3, 0.16, 'square', f); tone(t + i * 0.07, 0.3, 0.12, 'triangle', f * 2); }); },
 };

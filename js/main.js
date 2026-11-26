@@ -18,6 +18,8 @@ import { initAudio, sfx, setSfxVol, say } from './audio.js';
 import { bgmSet, bgmUpdate, bgmToggleMute, bgmInfo, setMusicVol } from './bgm.js';
 import { settings, save, seen, reach, record } from './save.js';
 import { menu, showMenu, hideMenu } from './menu.js';
+import { initElements, updateElements, clearElements, onElemKill, boom, el } from './elements.js';
+import { initElites, updateElites, clearElites, makeElite, onEliteKill, eliteHooks, eliteChance, ELITE_TYPES, AFFIX } from './elites.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c');
@@ -32,7 +34,7 @@ camera.rotation.order = 'YXZ';
 vmCam.near = 0.05; vmCam.far = 420;
 renderer.setClearColor(0xf2dfb4);
 const ink = new InkPass(renderer);
-buildWorld(scene); initFx(scene, camera); initEnemies(scene); initHud(); initSkills(scene); initHazards(scene); initSpecials(scene);
+buildWorld(scene); initFx(scene, camera); initEnemies(scene); initHud(); initSkills(scene); initHazards(scene); initSpecials(scene); initElements(scene); initElites(scene);
 setBuffSource(buffSummary);
 
 function resize() {
@@ -59,7 +61,7 @@ function startLevel(lv) {
 }
 function newGame(from) {
   clearShowcase();
-  resetStats(); resetCards(); clearEnemies(); clearDecals(); clearHazards(); resetPlayer(); resetWeapons(); resetHud(); resetSkills();
+  resetStats(); resetCards(); clearEnemies(); clearDecals(); clearHazards(); resetPlayer(); resetWeapons(); resetHud(); resetSkills(); clearElements(); clearElites();
   S.score = 0; S.over = false; S.running = true; S.streak = []; S.picking = false; S.cardAt = 0; S.cards = []; S.bossesDown = []; S.complete = false; S.endless = false;
   S.combo = 0; S.comboT = 0; S.bestCombo = 0;
   const L = from || window.__startLevel || 1;
@@ -94,7 +96,7 @@ function runComplete() {
   S.complete = true; S.picking = true; bgmSet('title'); say('run_complete');
   if (!window.__bot && document.pointerLockElement) document.exitPointerLock();
   const m = document.createElement('div'); m.id = 'complete'; m.className = 'over'; document.body.appendChild(m);
-  m.innerHTML = `<div class="card"><div class="runc">RUN COMPLETE · 全部通关</div><div class="logo" style="font-size:54px">MAKEITCLANG!</div><p class="sub">全部通关 · 30 关 · 6 BOSS</p>
+  m.innerHTML = `<div class="card"><div class="runc">RUN COMPLETE · 全部通关</div><div class="logo" style="font-size:54px">SCRAP RIOT!</div><p class="sub">全部通关 · 30 关 · 6 BOSS</p>
     <p class="tag3">分数 ${S.score} · 卡牌 ${S.cards.length} 张 · 武器 ${W.owned.length} 把</p>
     <button id="endless">无尽模式 ▶</button> <button id="restart" style="background:#333;color:#ddd">重新开始</button></div>`;
   $('endless').onclick = () => { m.remove(); S.picking = false; S.complete = false; S.nextT = 1; canvas.requestPointerLock(); };
@@ -133,7 +135,8 @@ function openCards() {
   sfx.card();
   const hand = draw(S.level); hand.forEach(c => seen('card', c.id));
   pickFn = showCards(S.level, hand, c => {
-    applyCard(c); sfx.pick(); pickFn = null; S.cards.push(c.id);
+    const set = applyCard(c); sfx.pick(); pickFn = null; S.cards.push(c.id);
+    if (set) { setTimeout(() => { comic(set.name + '!', set.color); banner(`套装激活 · ${set.name} ${set.en}`, 2.4); keyHint('★', set.desc, 7, ''); sfx.setOn(); }, 250); }
     if (c.kind === 'weapon') { banner('NEW WEAPON!', 2.2); comic(c.name + '!'); sfx.boom(); say('new_weapon'); }
     if (c.id === 's_hook') keyHint('E', '长按 E，把自己拉过去', 6);
     if (c.id === 's_dash') keyHint('⇧', '按 Shift 冲刺', 5);
@@ -149,7 +152,7 @@ let chainDepth = 0;
 hooks.onKill = e => {
   // 连杀：4 秒内接着杀就累计，评级越高分数倍率越高
   if (!e.noScore) { const r0 = rankOf(S.combo); S.combo++; S.comboT = 4; S.bestCombo = Math.max(S.bestCombo || 0, S.combo); const r1 = rankOf(S.combo); if (r1 > r0 && r1 >= 3) { sfx.pick(); if (r1 >= 4) comic(RANKS[r1][1] + ' RANK!', RANKS[r1][2]); } }
-  S.killed++; if (!e.noScore) S.score += Math.round(e.t.score * (S.scoreMul || 1) * (1 + rankOf(S.combo) * 0.1)); sfx.kill(e.type === 'hauler' || e.t.boss); hitMarker('kill');
+  S.killed++; if (!e.noScore) S.score += Math.round(e.t.score * (e.scoreMul || 1) * (S.scoreMul || 1) * (1 + rankOf(S.combo) * 0.1)); sfx.kill(e.type === 'hauler' || e.t.boss); hitMarker('kill');
   if (e.t.boss) bossDown(e);
   // 顿帧：爆头击杀、Boss 倒下时画面停一下；掉零件
   S.hitstop = Math.max(S.hitstop || 0, e.t.boss ? 0.3 : e.lastHead ? 0.07 : e.type === 'hauler' ? 0.06 : 0.025);
@@ -158,9 +161,9 @@ hooks.onKill = e => {
   if (mods.armorSteal) P.armor = Math.min(P.maxArmor, P.armor + mods.armorSteal);
   if (mods.chain && chainDepth < 3) {
     const c = new THREE.Vector3(e.pos.x, e.pos.y + 1, e.pos.z);
-    flashStar(c, 3.2); smoke(c, 6, 2.2, 0xffcf7a, 2); sfx.boom();
-    chainDepth++; blast(c, 4, mods.chain, e); chainDepth--;
+    chainDepth++; boom(c, 4, mods.chain, e); chainDepth--;
   }
+  onElemKill(e); onEliteKill(e);
   S.streak.push(S.time); S.streak = S.streak.filter(t => S.time - t < 2.5);
   if (S.streak.length === 3) { comic('RAMPAGE!'); sfx.boom(); S.score += 300; say('rampage', { droppable: true }); }
   else if (S.streak.length === 5) { comic('UNSTOPPABLE!', '#3a7ca5'); sfx.boom(); S.score += 600; say('unstoppable', { droppable: true }); }
@@ -197,8 +200,17 @@ function bossDown(e) {
 function spawnOne() {
   const type = S.toSpawn.shift();
   const p = findSpot(P.pos.x, P.pos.z, 18, 36) || findSpot(P.pos.x, P.pos.z, 10, 60) || { x: 0, z: -14 };
-  spawn(type, p.x, p.z, S.plan.hpMul);
+  const e = spawn(type, p.x, p.z, S.plan.hpMul);
+  if (e && ELITE_TYPES.includes(type) && Math.random() < eliteChance(S.level)) makeElite(e);
 }
+// 元素/精英的音效和震屏
+el.on.ignite = () => sfx.ignite(); el.on.zap = () => sfx.zap(); el.on.boom = () => sfx.boom(); el.on.shake = k => shakeK(k);
+eliteHooks.on.sfx = n => sfx[n] && sfx[n]();
+eliteHooks.on.shake = k => shakeK(k);
+eliteHooks.on.summon = () => { S.total++; };
+let firstQ = 0; // 第一次见到某个词条：漫画字+提示，多个同时出现就排队
+eliteHooks.on.first = a => { const A = AFFIX[a], now = performance.now(), at = Math.max(now + 700, firstQ); firstQ = at + 2600; setTimeout(() => { if (!S.running) return; comic('精英 · ' + A.name + '!', A.css); keyHint('!', A.tip, 4, ''); }, at - now); };
+window.G.makeElite = makeElite;
 
 // ---------- 输入 ----------
 // 菜单动作：开始（可选起始关）、继续、回主菜单
@@ -208,7 +220,7 @@ menu.on.start = lv => { initAudio(); applySettings(); pendingStart = lv; S.runni
 menu.on.resume = () => { initAudio(); canvas.requestPointerLock(); };
 menu.on.quit = () => toMain();
 function toMain() {
-  S.running = false; S.over = false; S.picking = false; clearEnemies(); clearHazards(); setSpecial(null);
+  S.running = false; S.over = false; S.picking = false; clearEnemies(); clearHazards(); clearElements(); clearElites(); setSpecial(null);
   $('hud').style.display = 'none'; const c = $('complete'); if (c) c.remove();
   P.pos.set(0, 0, 8); bgmSet('title'); buildShowcase(); showMenu('main');
 }
@@ -261,7 +273,7 @@ function step(dt) {
   if (P.onGround && sp > 3) { stepT += dt * sp; if (stepT > 2.6) { stepT = 0; sfx.step(); } }
   ev.hit = 0; ev.kill = 0; ev.shake = 0; updateWeapons(dt, ev);
   if (ev.shake) S.shake = Math.max(S.shake, ev.shake);
-  updateEnemies(dt, S.time); updateFx(dt); updateHazards(dt, S.time); updateSpecials(dt);
+  updateEnemies(dt, S.time); updateFx(dt); updateHazards(dt, S.time); updateSpecials(dt); updateElements(dt); updateElites(dt, S);
   // Boss 登场
   if (S.bossPending && !S.between) { S.bossIntroT -= dt; if (S.bossIntroT <= 0) spawnBoss(S.bossPending); }
   // 补给空投
