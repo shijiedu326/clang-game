@@ -1,3 +1,4 @@
+import { rand } from './rng.js';
 import * as THREE from 'three';
 import { enemies, spawn, blast, shieldHooks } from './enemies.js';
 import { P, hurtPlayer } from './player.js';
@@ -25,7 +26,7 @@ export const ELITE_TYPES = ['grunt', 'spotter', 'hauler', 'shieldbot', 'splitter
 const ringG = new THREE.RingGeometry(0.78, 1, 40), shellG = new THREE.SphereGeometry(1, 22, 14);
 const noInk = o => { o.layers.set(NO_INK); return o; };
 export function makeElite(e, affix) {
-  if (!affix) { const ks = Object.keys(AFFIX); affix = ks[(Math.random() * ks.length) | 0]; }
+  if (!affix) { const ks = Object.keys(AFFIX); affix = ks[(rand() * ks.length) | 0]; }
   const A = AFFIX[affix];
   e.elite = affix; e.hp *= 1.8; e.maxHp *= 1.8; e.scoreMul = 2.5; e.big = 1.15;
   if (affix === 'shield') e.shield = e.maxShield = e.maxHp * 0.6;

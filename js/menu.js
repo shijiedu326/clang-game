@@ -4,14 +4,15 @@ import { POOL } from './cards.js';
 import { ICON } from './hud.js';
 import { BOSS_ORDER } from './bosses.js';
 import { MAPS, mapForLevel } from './world.js';
+import { garagePage, dailyPage } from './garage.js';
 
 // 菜单：主菜单 / 暂停 / 结算 三种导航，子页面：选关、图鉴、设置
 export const menu = { on: {}, portrait: null, mode: null };
 const $ = id => document.getElementById(id);
 const NAV = {
-  main: [['start', '开始游戏 ▶', 1], ['levels', '选关'], ['codex', '图鉴 CODEX'], ['settings', '设置']],
+  main: [['start', '开始游戏 ▶', 1], ['daily', '每日挑战 DAILY'], ['levels', '选关'], ['garage', '车库 GARAGE'], ['codex', '图鉴 CODEX'], ['settings', '设置']],
   pause: [['resume', '继续 ▶', 1], ['settings', '设置'], ['codex', '图鉴 CODEX'], ['quit', '回主菜单']],
-  over: [['retry', '再来一次 ▶', 1], ['levels', '选关'], ['quit', '回主菜单']],
+  over: [['retry', '再来一次 ▶', 1], ['garage', '车库 GARAGE'], ['levels', '选关'], ['quit', '回主菜单']],
 };
 export function showMenu(mode, info = '') {
   menu.mode = mode;
@@ -19,13 +20,19 @@ export function showMenu(mode, info = '') {
   $('nav').innerHTML = NAV[mode].map(([k, t, big]) => `<button data-k="${k}" class="${big ? 'big' : ''}">${t}</button>`).join('');
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => act(b.dataset.k));
   $('mtitle').innerHTML = mode === 'pause' ? '<div class="logo sm">PAUSED</div>' : mode === 'over' ? '<div class="logo sm red">GAME OVER</div>' : '<div class="logo big"><span class="l1">SCRAP</span><span class="l2">RIOT!</span><i class="bolt">⚙</i></div><div class="sub">废铁暴动 · 拆机废品场</div><div class="tag3">SCRAP. SHOOT. SURVIVE.</div>';
-  $('minfo').innerHTML = info || (mode === 'main' ? `最高分 <b>${save.best}</b> · 最远第 <b>${save.bestLevel || 0}</b> 关 · 已玩 <b>${save.runs}</b> 局` : '');
+  $('minfo').innerHTML = info || (mode === 'main' ? mainInfo() : '');
   page(null);
+}
+const mainInfo = () => `最高分 <b>${save.best}</b> · 最远第 <b>${save.bestLevel || 0}</b> 关 · 已玩 <b>${save.runs}</b> 局<br><span class="gr-earn">⚙ 车库零件 <b>${save.parts}</b></span>`;
+// 车库里花了零件，左边的数字跟着变
+function refreshInfo() {
+  if (menu.mode === 'main') $('minfo').innerHTML = mainInfo();
+  else { const b = $('minfo').querySelector('.gr-earn b:last-child'); if (b) b.textContent = save.parts; }
 }
 export function hideMenu() { $('menu').style.display = 'none'; page(null); }
 function act(k) {
   if (k === 'start') menu.on.start(1);
-  else if (k === 'retry') menu.on.start(menu.lastStart || 1);
+  else if (k === 'retry') menu.on.start(menu.lastStart || 1, menu.lastMode);
   else if (k === 'resume') menu.on.resume();
   else if (k === 'quit') menu.on.quit();
   else page(k);
@@ -33,14 +40,16 @@ function act(k) {
 function page(k) {
   const p = $('page'); p.className = k ? 'on p-' + k : ''; if (!k) { p.innerHTML = ''; return; }
   const close = '<button class="x" title="关闭">✕</button>';
-  if (k === 'levels') {
+  if (k === 'garage') garagePage(p, close, () => { refreshInfo(); });
+  else if (k === 'daily') dailyPage(p, close, () => { menu.lastStart = 1; menu.lastMode = 'daily'; menu.on.start(1, 'daily'); });
+  else if (k === 'levels') {
     const bossName = lv => TYPES[BOSS_ORDER[(lv / 5 - 1) % 6]].name;
     p.innerHTML = close + `<h3>选关 <small>从第 1 关或打到过的 Boss 关开始；跳关会自动补发卡牌；每 10 关换一张地图</small></h3><div class="lvgrid">` +
       [1, 5, 10, 15, 20, 25, 30].map(lv => {
         const ok = save.reached.includes(lv);
         return `<div class="lv ${ok ? '' : 'lock'}" data-lv="${lv}"><b>${lv}</b><span>${lv === 1 ? '从头开始' : ok ? 'BOSS · ' + bossName(lv) : '未到达'}</span>${lv > 1 && ok ? `<i>补发 ${Math.floor((lv - 1) / 2)} 张卡</i>` : ''}<em class="lvmap lvmap-${mapForLevel(lv)}">${MAPS[mapForLevel(lv)].name}</em></div>`;
       }).join('') + '</div>';
-    p.querySelectorAll('.lv:not(.lock)').forEach(d => d.onclick = () => { menu.lastStart = +d.dataset.lv; menu.on.start(+d.dataset.lv); });
+    p.querySelectorAll('.lv:not(.lock)').forEach(d => d.onclick = () => { menu.lastStart = +d.dataset.lv; menu.lastMode = null; menu.on.start(+d.dataset.lv); });
   } else if (k === 'codex') {
     p.innerHTML = close + `<h3>图鉴 CODEX <span class="tabs"><button data-t="foe" class="on">敌人</button><button data-t="boss">BOSS</button><button data-t="card">卡牌</button></span></h3><div class="cxgrid"></div>`;
     const fill = t => {

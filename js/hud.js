@@ -119,8 +119,8 @@ export function updateHud(dt, S, ev) {
   fpsAcc += dt; fpsN++; if ((fpsT += dt) > 0.5) { $('fps').firstChild.textContent = Math.round(fpsN / fpsAcc); fpsAcc = fpsN = fpsT = 0; }
   // 顶条
   comboHud(S);
-  $('lvl').textContent = S.level; $('left').textContent = S.toSpawn.length + enemies.length + (S.bossPending ? 1 : 0); $('score').textContent = S.score;
-  $('topbar').querySelector('.tag').textContent = difficulty(S.level);
+  $('lvl').textContent = S.level; $('left').textContent = S.toSpawn.length + enemies.length + (S.bossPending ? 1 : 0); $('score').textContent = S.score; $('parts').textContent = Math.floor(S.parts || 0);
+  $('topbar').querySelector('.tag').textContent = (S.daily ? '每日 · ' : '') + difficulty(S.level);
   const sp = $('special'); const stxt = S.plan && S.plan.boss ? '★ BOSS 战' : S.special ? '特殊关卡 · ' + SPECIALS[S.special] : '';
   sp.hidden = !stxt; if (stxt && sp.textContent !== stxt) sp.textContent = stxt;
   // Boss 进度条：5 10 15 20 25 30

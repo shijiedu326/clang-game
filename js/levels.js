@@ -1,3 +1,4 @@
+import { rand } from './rng.js';
 import { BOSS_ORDER } from './bosses.js';
 
 // 关卡规划：每 5 关一个 Boss；第 7/9/12 关固定特殊关，之后随机；30 关后进入无尽（循环加强）
@@ -14,10 +15,10 @@ export function planLevel(lv) {
   }
   let special = null;
   if (lv === 7) special = 'storm'; else if (lv === 9) special = 'supply'; else if (lv === 12) special = 'nest';
-  else if (lv > 12 && Math.random() < 0.3) { const pool = Math.floor((lv - 1) / 10) % 3 === 0 ? ['storm', 'nest', 'supply'] : ['nest', 'supply']; special = pool[(Math.random() * pool.length) | 0]; } // 沙尘暴只在废品场
+  else if (lv > 12 && rand() < 0.3) { const pool = Math.floor((lv - 1) / 10) % 3 === 0 ? ['storm', 'nest', 'supply'] : ['nest', 'supply']; special = pool[(rand() * pool.length) | 0]; } // 沙尘暴只在废品场
   const n = Math.min(6 + lv * 2, 40) + cycle * 6, list = [];
   for (let i = 0; i < n; i++) {
-    let t = 'grunt'; const r = Math.random();
+    let t = 'grunt'; const r = rand();
     const w = {
       spotter: lv >= 2 ? Math.min(0.15 + lv * 0.015, 0.32) : 0,
       hauler: lv >= 3 ? Math.min(0.06 + lv * 0.01, 0.2) : 0,

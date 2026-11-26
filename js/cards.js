@@ -1,3 +1,4 @@
+import { rand } from './rng.js';
 import { mods, skills } from './stats.js';
 import { P } from './player.js';
 import { W, giveWeapon, refillAll, upgradeWeapon, wlv, UPG, DEFS } from './weapons.js';
@@ -84,17 +85,17 @@ export function draw(level) {
   const avail = POOL.filter(c => (!c.ok || c.ok()) && !(c.kind !== 'mod' && taken.get(c.id)));
   const out = [];
   const weapons = avail.filter(c => c.kind === 'weapon');
-  if (weapons.length && (level <= 2 || Math.random() < 0.5)) out.push(weighted(weapons));
+  if (weapons.length && (level <= 2 || rand() < 0.5)) out.push(weighted(weapons));
   while (out.length < 3) {
     const rest = avail.filter(c => !out.includes(c)); if (!rest.length) break;
     out.push(weighted(rest));
   }
-  return out.sort(() => Math.random() - 0.5);
+  return out.sort(() => rand() - 0.5);
 }
 // 已经走了某个流派，同流派的卡更容易出现
 function wt(c) { let w = RW[c.rarity]; if (c.tag) { const n = tagCount(c.tag); if (n) w *= mods.sets[c.tag] ? 1.5 : 1 + n * 1.2; } return w; }
 function weighted(list) {
-  let s = list.reduce((a, c) => a + wt(c), 0), r = Math.random() * s;
+  let s = list.reduce((a, c) => a + wt(c), 0), r = rand() * s;
   for (const c of list) { r -= wt(c); if (r <= 0) return c; } return list[0];
 }
 // 返回新激活的套装（没有就是 null）

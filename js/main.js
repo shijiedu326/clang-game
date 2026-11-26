@@ -23,6 +23,8 @@ import { menu, showMenu, hideMenu } from './menu.js';
 import { initElements, updateElements, clearElements, onElemKill, boom, el } from './elements.js';
 import { initRockets, updateRockets, clearRockets, rHooks } from './rockets.js';
 import { initCritters2, updateMines, clearMines, c2Hooks } from './critters2.js';
+import { applyMeta, partsFor, bankParts, dailyInfo, dailyTry, dailyRecord, keyText, RULES } from './meta.js';
+import { seeded } from './rng.js';
 import { initElites, updateElites, clearElites, makeElite, onEliteKill, eliteHooks, eliteChance, ELITE_TYPES, AFFIX } from './elites.js';
 
 const $ = id => document.getElementById(id);
@@ -54,13 +56,14 @@ export const S = { level: 1, score: 0, toSpawn: [], total: 0, killed: 0, running
 window.G = { S, P, enemies, W, scene, camera, setMap, MAPS, setWeather, mapOf: () => MAP };
 
 function startLevel(lv) {
-  const plan = planLevel(lv); reach(lv); clearMines();
+  const D = S.daily, plan = D ? seeded(D.key * 1000 + lv, () => planLevel(lv)) : planLevel(lv); if (!D) reach(lv); clearMines();
+  if (D && D.rules.includes('rich')) { plan.hpMul = (plan.hpMul || 1) * 1.3; plan.bossMul = (plan.bossMul || 1) * 1.3; }
   // 每 10 关换一张地图：换图时把人送回出生点，清掉地上的弹孔和箱子
   const mid = mapForLevel(lv), moved = setMap(mid), M = MAPS[mid];
   if (moved) { P.pos.set(0, 0, 8); P.vel.set(0, 0, 0); clearDecals(); clearHazards(); }
   setWeather(M.weather);
   S.level = lv; S.plan = plan; S.toSpawn = plan.list; S.total = plan.list.length + (plan.boss ? 1 : 0); S.killed = 0; S.between = false; S.spawnT = 1.8;
-  S.special = plan.special; S.scoreMul = plan.special === 'supply' ? 2 : 1; setSpecial(plan.special);
+  S.special = plan.special; S.scoreMul = (plan.special === 'supply' ? 2 : 1) * (D && D.rules.includes('rich') ? 1.5 : 1); setSpecial(plan.special);
   S.dropT = plan.special === 'supply' ? 6 : plan.boss ? 20 : 30;
   S.bossPending = plan.boss; S.bossE = null;
   bgmSet(plan.boss ? (((lv / 5 - 1) % 6) < 3 ? 'boss1' : 'boss2') : plan.special === 'storm' ? 'storm' : 'fight');
@@ -69,12 +72,15 @@ function startLevel(lv) {
   if (moved && lv > 1) comic('新地图 · ' + M.name + '!', mid === 'mill' ? '#e8731f' : '#3a7ca5');
   if (plan.special) setTimeout(() => comic(SPECIALS[plan.special] + '!', plan.special === 'supply' ? '#2f8a2f' : '#a8743e'), moved && lv > 1 ? 1500 : 0);
 }
-function newGame(from) {
+function newGame(from, mode) {
   clearShowcase();
   resetStats(); resetCards(); clearEnemies(); clearDecals(); clearHazards(); resetPlayer(); resetWeapons(); resetHud(); resetSkills(); clearElements(); clearElites(); clearRockets(); clearMines();
   S.score = 0; S.over = false; S.running = true; S.streak = []; S.picking = false; S.cardAt = 0; S.cards = []; S.bossesDown = []; S.complete = false; S.endless = false;
-  S.combo = 0; S.comboT = 0; S.bestCombo = 0;
-  const L = from || window.__startLevel || 1;
+  S.combo = 0; S.comboT = 0; S.bestCombo = 0; S.parts = 0; S.banked = 0;
+  // 每日挑战：固定从第 1 关开始，种子=日期
+  S.daily = mode === 'daily' ? dailyInfo() : null; if (S.daily) dailyTry(S.daily.key);
+  for (const id of applyMeta(S)) { S.cards.push(id); seen('card', id); }
+  const L = S.daily ? 1 : from || window.__startLevel || 1;
   S.startLevel = L;
   // 跳关：按每两关一张补发卡牌，优先给武器
   if (L > 1) {
@@ -99,6 +105,7 @@ menu.on.apply = applySettings;
 function spawnBoss(type) {
   const p = findSpot(P.pos.x, P.pos.z, 16, 26, 3) || findSpot(0, 0, 0, 30, 3) || { x: 0, z: -20 };
   const e = spawn(type, p.x, p.z, S.plan.bossMul || 1); S.bossE = e; S.bossPending = null;
+  if (e && S.daily && S.daily.rules.includes('fast')) e.spd = (e.spd || 1) * 1.25;
   shakeK(1); sfx.roar();
 }
 // 通关：第 30 关 Boss 倒下后
@@ -110,7 +117,7 @@ function runComplete() {
     <p class="tag3">分数 ${S.score} · 卡牌 ${S.cards.length} 张 · 武器 ${W.owned.length} 把</p>
     <button id="endless">无尽模式 ▶</button> <button id="restart" style="background:#333;color:#ddd">重新开始</button></div>`;
   $('endless').onclick = () => { m.remove(); S.picking = false; S.complete = false; S.nextT = 1; canvas.requestPointerLock(); };
-  $('restart').onclick = () => location.reload();
+  $('restart').onclick = () => { bankParts(S); location.reload(); };
 }
 window.G.runComplete = runComplete;
 // ---------- 档案卡头像：用同一套描边渲染机器人半身像 ----------
@@ -143,7 +150,7 @@ function openCards() {
   S.picking = true; mouseUp();
   if (!window.__bot && document.pointerLockElement) document.exitPointerLock();
   sfx.card();
-  const hand = draw(S.level); hand.forEach(c => seen('card', c.id));
+  const hand = S.daily ? seeded(S.daily.key * 1000 + S.level + 500, () => draw(S.level)) : draw(S.level); hand.forEach(c => seen('card', c.id));
   pickFn = showCards(S.level, hand, c => {
     const set = applyCard(c); sfx.pick(); pickFn = null; S.cards.push(c.id);
     if (set) { setTimeout(() => { comic(set.name + '!', set.color); banner(`套装激活 · ${set.name} ${set.en}`, 2.4); keyHint('★', set.desc, 7, ''); sfx.setOn(); }, 250); }
@@ -167,7 +174,9 @@ hooks.onKill = e => {
   // 顿帧：爆头击杀、Boss 倒下时画面停一下；掉零件
   S.hitstop = Math.max(S.hitstop || 0, e.t.boss ? 0.3 : e.lastHead ? 0.07 : e.type === 'hauler' ? 0.06 : 0.025);
   if (!e.noScore) scrap(new THREE.Vector3(e.pos.x, e.pos.y + 0.8, e.pos.z), e.t.boss ? 30 : e.type === 'hauler' ? 8 : e.type === 'drone' ? 1 : 3);
+  if (!e.noScore) S.parts += partsFor(e) * (S.partsMul || 1);
   if (mods.lifesteal) P.hp = Math.min(P.maxHp, P.hp + mods.lifesteal);
+  if (S.daily && S.daily.rules.includes('noheal')) P.hp = Math.min(P.maxHp, P.hp + 3);
   if (mods.armorSteal) P.armor = Math.min(P.maxArmor, P.armor + mods.armorSteal);
   if (mods.chain && chainDepth < 3) {
     const c = new THREE.Vector3(e.pos.x, e.pos.y + 1, e.pos.z);
@@ -212,8 +221,10 @@ function bossDown(e) {
 function spawnOne() {
   const type = S.toSpawn.shift();
   const p = findSpot(P.pos.x, P.pos.z, 18, 36) || findSpot(P.pos.x, P.pos.z, 10, 60) || { x: 0, z: -14 };
-  const e = spawn(type, p.x, p.z, S.plan.hpMul);
-  if (e && ELITE_TYPES.includes(type) && Math.random() < eliteChance(S.level)) makeElite(e);
+  const e = spawn(type, p.x, p.z, S.plan.hpMul), R = S.daily ? S.daily.rules : [];
+  const ch = R.includes('elite') ? Math.max(0.12, eliteChance(S.level)) * 2 : eliteChance(S.level);
+  if (e && ELITE_TYPES.includes(type) && Math.random() < ch) makeElite(e);
+  if (e && R.includes('fast')) e.spd = (e.spd || 1) * 1.25;
 }
 // 元素/精英的音效和震屏
 el.on.ignite = () => sfx.ignite(); el.on.zap = () => sfx.zap(); el.on.boom = () => sfx.boom(); el.on.shake = k => shakeK(k);
@@ -229,26 +240,34 @@ window.G.makeElite = makeElite;
 
 // ---------- 输入 ----------
 // 菜单动作：开始（可选起始关）、继续、回主菜单
-let pendingStart = 0;
+let pendingStart = 0, pendingMode = null;
 menu.portrait = t => portrait(t);
-menu.on.start = lv => { initAudio(); applySettings(); pendingStart = lv; S.running = false; canvas.requestPointerLock(); };
+menu.on.start = (lv, mode) => { initAudio(); applySettings(); pendingStart = lv; pendingMode = mode || null; S.running = false; canvas.requestPointerLock(); };
 menu.on.resume = () => { initAudio(); canvas.requestPointerLock(); };
 menu.on.quit = () => toMain();
 function toMain() {
+  if (S.running || S.over) bankParts(S);
   S.running = false; S.over = false; S.picking = false; clearEnemies(); clearHazards(); clearElements(); clearElites(); clearRockets(); clearMines(); setMap('yard'); setWeather(null); setSpecial(null);
   $('hud').style.display = 'none'; const c = $('complete'); if (c) c.remove();
   P.pos.set(0, 0, 8); bgmSet('title'); buildShowcase(); showMenu('main');
 }
 function gameOver() {
-  const prev = save.best; record(S.score); say('game_over');
-  showMenu('over', `撑到第 <b>${S.level}</b> 关 · <b>${S.score}</b> 分 · 最高连杀 <b>${S.bestCombo || 0}</b>` + (S.score > prev ? ' · <b>新纪录!</b>' : ` · 最高分 <b>${save.best}</b>`));
-  menu.lastStart = S.startLevel; bgmSet('title');
+  const prev = save.best; record(S.score); say('game_over'); const got = bankParts(S);
+  let info = `撑到第 <b>${S.level}</b> 关 · <b>${S.score}</b> 分 · 最高连杀 <b>${S.bestCombo || 0}</b>`;
+  if (S.daily) {
+    // 每日挑战：和今天之前的自己比
+    const r = dailyRecord(S.daily.key, S.score, S.level);
+    info = `<span class="dy-tag">每日挑战 ${keyText(S.daily.key)}</span><br>` + info + (r.isBest ? (r.prevBest ? ` · <b>刷新今日最佳!</b>（原 ${r.prevBest}）` : ' · <b>今日首个成绩</b>') : ` · 今日最佳 <b>${r.rec.best}</b>`) + ` · 第 <b>${r.rec.tries}</b> 次`;
+  } else info += S.score > prev ? ' · <b>新纪录!</b>' : ` · 最高分 <b>${save.best}</b>`;
+  info += `<br><span class="gr-earn">⚙ 带出零件 <b>+${got}</b> · 车库共 <b>${save.parts}</b></span>`;
+  showMenu('over', info);
+  menu.lastStart = S.startLevel; menu.lastMode = S.daily ? 'daily' : null; bgmSet('title');
 }
 // 第一次点击页面就开声音，主菜单放标题曲
 addEventListener('pointerdown', () => { initAudio(); setSfxVol(settings.sfx); if (!S.running) bgmSet('title'); });
 initInput(canvas, locked => {
   $('hud').style.display = locked || S.running ? 'block' : 'none';
-  if (locked) { hideMenu(); if (pendingStart) { const L = pendingStart; pendingStart = 0; newGame(L); } return; }
+  if (locked) { hideMenu(); if (pendingStart) { const L = pendingStart; pendingStart = 0; newGame(L, pendingMode); } return; }
   if (S.picking || S.complete) return;
   if (S.over) { S.running = false; gameOver(); return; }
   if (S.running) showMenu('pause');
@@ -300,13 +319,15 @@ function step(dt) {
   }
   if (!S.between && !S.toSpawn.length && !enemies.length && !S.bossPending && S.running) {
     S.between = true; S.nextT = 3.2; clearMines(); banner('STAGE CLEAR!', 2.4); sfx.jingle(true); setTimeout(() => say('stage_clear'), 300);
-    P.armor = Math.min(P.maxArmor, P.armor + 20); P.hp = Math.min(P.maxHp, P.hp + 15);
+    if (!(S.daily && S.daily.rules.includes('noheal'))) { P.armor = Math.min(P.maxArmor, P.armor + 20); P.hp = Math.min(P.maxHp, P.hp + 15 + (S.healBonus || 0)); }
+    S.parts += Math.ceil(S.level / 3) * (S.partsMul || 1); bankParts(S);
     setSpecial(null);
     if (S.level === LAST && !S.endless) { S.endless = true; S.cardAt = 0; setTimeout(runComplete, 2200); }
-    else if (S.level % 2 === 0) S.cardAt = 1.4; // 每过两关选一张卡
+    else if (S.level % 2 === 0 || (S.daily && S.daily.rules.includes('cards'))) S.cardAt = 1.4; // 每过两关选一张卡
   }
   if (S.cardAt > 0 && (S.cardAt -= dt) <= 0) openCards();
   if (S.between && !S.picking && !(S.cardAt > 0)) { S.nextT -= dt; if (S.nextT <= 0) startLevel(S.level + 1); }
+  if (P.hp <= 0 && !S.over && S.revive > 0) { S.revive--; P.hp = Math.ceil(P.maxHp / 2); P.armor = P.maxArmor; comic('备用核心启动!', '#2f8a2f'); banner('REVIVED!', 1.6); sfx.setOn(); S.shake = 1; for (const m of enemies) if (!m.dead && !m.t.heavy && m.pos.distanceTo(P.pos) < 7) { const d = new THREE.Vector3(m.pos.x - P.pos.x, 0, m.pos.z - P.pos.z).normalize(); m.kb = (m.kb || new THREE.Vector3()).addScaledVector(d, 16); } }
   if (P.hp <= 0 && !S.over) { S.over = true; document.exitPointerLock && document.exitPointerLock(); }
   updateVM(dt, { moving: sp > 1 && P.onGround, air: !P.onGround, lookDX: P.lookDX / Math.max(dt, 0.008) * 0.016, lookDY: P.lookDY / Math.max(dt, 0.008) * 0.016, reload: reloadProgress() });
   P.lookDX = P.lookDY = 0;
@@ -361,6 +382,7 @@ window.G.shot = async (name, w = 1280, h = 800) => {
   renderer.setPixelRatio(DPR); resize();
   await fetch('/__shot?name=' + name, { method: 'POST', body: url }); return 'saved';
 };
+window.G.bankParts = () => bankParts(S); window.G.save = save;
 window.G.render = render; window.G.renderer = renderer; window.G.toMain = toMain;
 applySettings(); buildShowcase(); showMenu('main');
 requestAnimationFrame(frame);

@@ -3,7 +3,7 @@ const KS = 'clang_settings', KP = 'clang_save';
 export const DEFAULTS = { sens: 1, fov: 78, music: 0.62, sfx: 0.55, quality: 'high' }; // quality: high / mid / low
 const load = (k, d) => { try { return Object.assign(structuredClone(d), JSON.parse(localStorage.getItem(k) || '{}')); } catch { return structuredClone(d); } };
 export const settings = load(KS, DEFAULTS);
-export const save = load(KP, { best: 0, bestLevel: 0, reached: [1], codex: {}, cards: {}, runs: 0 });
+export const save = load(KP, { best: 0, bestLevel: 0, reached: [1], codex: {}, cards: {}, runs: 0, parts: 0, partsAll: 0, unlocks: {}, talents: {}, loadout: {}, daily: {} });
 export function saveSettings() { try { localStorage.setItem(KS, JSON.stringify(settings)); } catch {} }
 export function saveProgress() { try { localStorage.setItem(KP, JSON.stringify(save)); } catch {} }
 export function seen(kind, id) { const m = kind === 'card' ? save.cards : save.codex; if (!m[id]) { m[id] = 1; saveProgress(); } }
